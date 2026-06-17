@@ -1,0 +1,54 @@
+2026-04-20 20:18:25.910398-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+select u1_0.id,u1_0.company_id,u1_0.email,u1_0.password,u1_0.reset_code,u1_0.reset_code_expiry from users u1_0 where u1_0.email=? [42104-240]
+2026-04-20 20:18:25.910325-03:00 jdbc[4]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+select u1_0.id,u1_0.company_id,u1_0.email,u1_0.password,u1_0.reset_code,u1_0.reset_code_expiry from users u1_0 where u1_0.email=? [42104-240]
+2026-04-20 21:12:06.942480-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAK... (34303)"; SQL statement:
+update company set email=?,logo=?,name=? where id=? [22001-240]
+2026-04-20 23:48:53.649066-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAK... (34303)"; SQL statement:
+update company set email=?,logo=?,name=? where id=? [22001-240]
+2026-04-20 23:48:53.965665-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAK... (34303)"; SQL statement:
+update company set email=?,logo=?,name=? where id=? [22001-240]
+2026-04-21 12:08:47.335437-03:00 jdbc[4]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAAJTCAMAAACvuVeQAAADAFBMVEVHc... (48086)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-21 12:08:52.520205-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAAJTCAMAAACvuVeQAAADAFBMVEVHc... (48086)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:51:01.788045-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:51:17.093878-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:51:21.136179-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:51:25.017671-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:52:03.632989-03:00 jdbc[4]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:52:11.970221-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:52:29.431805-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:52:34.922255-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:52:47.813327-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:53:23.469775-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]
+2026-04-22 16:53:25.281204-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "LOGO CHARACTER VARYING(255)": "'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodp... (50107)"; SQL statement:
+update company set dark_mode=?,email=?,logo=?,name=?,primary_color=? where id=? [22001-240]

@@ -1,0 +1,262 @@
+package bodega_system.controller;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import bodega_system.dto.SalesReportDTO;
+import bodega_system.dto.SalesStatsDTO;
+import bodega_system.entity.*;
+import bodega_system.repository.*;
+import jakarta.servlet.http.HttpServletRequest;
+
+
+@RestController
+@RequestMapping("/sales")
+public class SaleController {
+
+    private final SaleRepository saleRepository;
+    private final ProductRepository productRepository;
+    private final PreparedProductRepository preparedProductRepository;
+
+    public SaleController(SaleRepository saleRepository, ProductRepository productRepository, PreparedProductRepository preparedProductRepository) {
+        this.saleRepository = saleRepository;
+        this.productRepository = productRepository;
+        this.preparedProductRepository = preparedProductRepository;
+    }
+
+    @PostMapping
+    public ResponseEntity<Void> create(@RequestBody Sale sale, HttpServletRequest req) {
+
+        Long companyId = (Long) req.getAttribute("companyId");
+
+        Company company = new Company();
+        company.setId(companyId);
+
+        double total = 0;
+
+        sale.setCreatedAt(LocalDateTime.now());
+        System.out.println("COMPANY ID: " + companyId);
+        sale.setCompany(company);
+
+        if (sale.getItems() == null || sale.getItems().isEmpty()){
+            throw new RuntimeException("Debe agregar al menos un producto");
+        }
+
+        for (SaleItem item : sale.getItems()) {
+            if (item.getQuantity() <= 0){
+                throw new RuntimeException("La cantidad debe ser mayor a cero");
+            }
+            String itemType = item.getItemType();
+            if (itemType == null){
+                itemType = "PRODUCT";
+            }
+
+            if (itemType.equals("PRODUCT")){
+                Product product = productRepository.findById(item.getProductId())
+                        .orElseThrow();
+                if (!product.getCompany().getId().equals(companyId)){
+                    throw new RuntimeException("Producto no autorizado");
+                }
+                if (product.getStock() < item.getQuantity()){
+                    throw new RuntimeException(
+                        "Stock insuficiente para " + product.getName()
+                    );
+                }
+
+                product.setStock(product.getStock() - item.getQuantity());
+                productRepository.save(product);
+
+                item.setProductName(product.getName());
+                item.setPrice(product.getPrice());
+                item.setItemType("PRODUCT");
+
+                total += item.getQuantity() * product.getPrice();
+            }
+            if (itemType.equals("PREPARED")){
+                PreparedProduct prepared =
+                        preparedProductRepository
+                                .findById(item.getPreparedProductId())
+                                .orElseThrow();
+                if (!prepared.getCompany().getId().equals(companyId)){
+                    throw new RuntimeException("Preparado no autorizado");
+                }
+                Product baseProduct = prepared.getBaseProduct();
+                double stockToDiscount =
+                        item.getQuantity() / prepared.getServingsPerUnit();
+                if (baseProduct.getStock() < stockToDiscount){
+                    throw new RuntimeException(
+                        "Stock insuficiente para " + baseProduct.getName()
+                    );
+                }
+
+                baseProduct.setStock(
+                    baseProduct.getStock() - stockToDiscount
+                );
+                productRepository.save(baseProduct);
+
+                item.setProductName(prepared.getName());
+                item.setPrice(prepared.getPrice());
+                item.setItemType("PREPARED");
+
+                total += item.getQuantity() * prepared.getPrice();
+            }
+
+            item.setSale(sale);
+        }
+
+        sale.setTotal(total);
+        if (sale.getPayments() == null || sale.getPayments().isEmpty()){
+            throw new RuntimeException("Debe registrar al menos un pago");
+        }
+        for(SalePayment payment: sale.getPayments()){
+            if (payment.getAmount() <= 0){
+                throw new RuntimeException("El importe del pago debe ser mayor a cero");
+            }
+        }
+
+        double paymentsTotal = sale.getPayments()
+            .stream()
+            .mapToDouble(SalePayment::getAmount)
+            .sum();
+
+        if (Math.abs(paymentsTotal - total) > 0.01) {
+            throw new RuntimeException("Los pagos no coinciden con el total");
+        }
+
+        for (SalePayment payment : sale.getPayments()) {
+            payment.setSale(sale);
+        }
+
+        saleRepository.save(sale);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping
+    public List<Sale> getAll(HttpServletRequest req) {
+        Long companyId = (Long) req.getAttribute("companyId");
+        List<Sale> sales = saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
+        System.out.println("Ventas: " + sales.size());
+        return sales;
+    }
+
+    @GetMapping("/stats")
+    public SalesStatsDTO stats(HttpServletRequest request) {
+
+        Long companyId =
+            (Long) request.getAttribute("companyId");
+
+        List<Sale> sales =
+            saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
+
+        LocalDate today = LocalDate.now();
+
+        SalesStatsDTO dto = new SalesStatsDTO();
+
+        dto.today = sales.stream()
+            .filter(s ->
+                s.getCreatedAt() != null &&
+                s.getCreatedAt()
+                .toLocalDate()
+                .equals(today)
+            )
+            .mapToDouble(Sale::getTotal)
+            .sum();
+
+        dto.week = sales.stream()
+            .filter(s ->
+                s.getCreatedAt() != null &&
+                s.getCreatedAt()
+                .isAfter(LocalDateTime.now().minusDays(7))
+            )
+            .mapToDouble(Sale::getTotal)
+            .sum();
+
+        dto.month = sales.stream()
+            .filter(s ->
+                s.getCreatedAt() != null &&
+                s.getCreatedAt()
+                .isAfter(LocalDateTime.now().minusDays(30))
+            )
+            .mapToDouble(Sale::getTotal)
+            .sum();
+
+        dto.total = sales.stream()
+            .mapToDouble(Sale::getTotal)
+            .sum();
+
+        return dto;
+    }
+
+    
+    @GetMapping("/report")
+    public SalesReportDTO report(
+            @RequestParam String from,
+            @RequestParam String to,
+            HttpServletRequest request) {
+
+        Long companyId =
+            (Long) request.getAttribute("companyId");
+
+        LocalDateTime fromDate =
+            LocalDateTime.parse(from);
+
+        LocalDateTime toDate =
+            LocalDateTime.parse(to);
+
+        List<Sale> sales =
+            saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId)
+                .stream()
+                .filter(s ->
+                    s.getCreatedAt() != null &&
+                    s.getCreatedAt().isAfter(fromDate) &&
+                    s.getCreatedAt().isBefore(toDate)
+                )
+                .toList();
+
+        SalesReportDTO dto = new SalesReportDTO();
+
+        dto.total = sales.stream()
+            .mapToDouble(Sale::getTotal)
+            .sum();
+
+        dto.salesCount = (long) sales.size();
+
+        dto.averageTicket =
+            dto.salesCount > 0
+                ? dto.total / dto.salesCount
+                : 0;
+
+        dto.productsSold = sales.stream()
+            .flatMap(s -> s.getItems().stream())
+            .mapToInt(SaleItem::getQuantity)
+            .sum();
+        
+        for (Sale sale : sales) {
+
+            if (sale.getPayments() == null) continue;
+
+            for (SalePayment payment : sale.getPayments()) {
+
+                switch (payment.getMethod()) {
+
+                    case CASH ->
+                        dto.cash += payment.getAmount();
+
+                    case TRANSFER ->
+                        dto.transfer += payment.getAmount();
+
+                    case DEBIT ->
+                        dto.debit += payment.getAmount();
+
+                    case CREDIT ->
+                        dto.credit += payment.getAmount();
+                }
+            }
+        }
+
+        dto.sales = sales;
+        return dto;
+    }
+}
