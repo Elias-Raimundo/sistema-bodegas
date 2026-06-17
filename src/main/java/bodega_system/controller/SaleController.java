@@ -2,7 +2,10 @@ package bodega_system.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import bodega_system.dto.SalesReportDTO;
@@ -139,6 +142,37 @@ public class SaleController {
         List<Sale> sales = saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
         System.out.println("Ventas: " + sales.size());
         return sales;
+    }
+
+    @GetMapping("/payment-stats")
+    public Map<String, Double> paymentStats(HttpServletRequest request) {
+
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        List<Sale> sales =
+            saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
+
+        Map<String, Double> stats = new HashMap<>();
+
+        stats.put("CASH", 0.0);
+        stats.put("TRANSFER", 0.0);
+        stats.put("DEBIT", 0.0);
+        stats.put("CREDIT", 0.0);
+
+        for (Sale sale : sales) {
+            if (sale.getPayments() == null) continue;
+
+            for (SalePayment payment : sale.getPayments()) {
+                String method = payment.getMethod().name();
+
+                stats.put(
+                    method,
+                    stats.getOrDefault(method, 0.0) + payment.getAmount()
+                );
+            }
+        }
+
+        return stats;
     }
 
     @GetMapping("/stats")
