@@ -154,10 +154,10 @@ public class SaleController {
 
         Map<String, Double> stats = new HashMap<>();
 
-        stats.put("CASH", 0.0);
-        stats.put("TRANSFER", 0.0);
-        stats.put("DEBIT", 0.0);
-        stats.put("CREDIT", 0.0);
+        stats.put("cash", 0.0);
+        stats.put("transfer", 0.0);
+        stats.put("debit", 0.0);
+        stats.put("credit", 0.0);
 
         for (Sale sale : sales) {
             if (sale.getPayments() == null) continue;
