@@ -163,12 +163,14 @@ public class SaleController {
             if (sale.getPayments() == null) continue;
 
             for (SalePayment payment : sale.getPayments()) {
-                String method = payment.getMethod().name();
-
-                stats.put(
-                    method,
-                    stats.getOrDefault(method, 0.0) + payment.getAmount()
-                );
+                
+                switch (payment.getMethod()) {
+                    case CASH -> stats.put("cash",stats.get("cash") + payment.getAmount());
+                    case TRANSFER -> stats.put("transfer", stats.get("transfer") + payment.getAmount());
+                    case DEBIT -> stats.put("debit", stats.get("debit") + payment.getAmount());
+                    case CREDIT -> stats.put("credit", stats.get("credit") + payment.getAmount());
+                        
+                }
             }
         }
 
