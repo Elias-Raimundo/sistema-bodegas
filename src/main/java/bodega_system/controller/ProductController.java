@@ -193,7 +193,7 @@ public class ProductController {
                     continue;
                 }
 
-                String[] data = line.split(",", -1);
+                String[] data = line.split("[,;]", -1);
 
                 if (data.length < 4) {
                     throw new RuntimeException(
