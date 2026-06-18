@@ -2,7 +2,10 @@ package bodega_system.controller;
 
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-
+import org.springframework.web.multipart.MultipartFile;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import bodega_system.dto.DashboardStats;
 import bodega_system.entity.Company;
 import bodega_system.entity.Product;
@@ -150,5 +153,154 @@ public class ProductController {
                 .sum();
 
         return stats;
+    }
+
+   @PostMapping("/import")
+    public String importProducts(
+        @RequestParam("file") MultipartFile file,
+        HttpServletRequest request
+    ) {
+
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        Company company =
+            companyRepository.findById(companyId)
+                .orElseThrow();
+
+        int created = 0;
+        int updated = 0;
+
+        try (
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(
+                    file.getInputStream(),
+                    StandardCharsets.UTF_8
+                )
+            )
+        ) {
+
+            String line;
+            boolean firstLine = true;
+
+            while ((line = reader.readLine()) != null) {
+
+                if (firstLine) {
+                    firstLine = false;
+                    continue;
+                }
+
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+
+                String[] data = line.split(",", -1);
+
+                if (data.length < 4) {
+                    throw new RuntimeException(
+                        "Fila inválida: " + line
+                    );
+                }
+
+                String name = data[0].trim();
+                Double price = Double.parseDouble(data[1].trim());
+                Double stockToAdd = Double.parseDouble(data[2].trim());
+                String categoryName = data[3].trim();
+                String description =
+                    data.length > 4 ? data[4].trim() : "";
+
+                if (name.isEmpty()) {
+                    throw new RuntimeException(
+                        "Producto sin nombre"
+                    );
+                }
+
+                if (price < 0 || stockToAdd < 0) {
+                    throw new RuntimeException(
+                        "Precio o stock inválido en: " + name
+                    );
+                }
+
+                Category category = null;
+
+                if (!categoryName.isEmpty()) {
+
+                    category = categoryRepository
+                        .findByNameIgnoreCaseAndCompany(
+                            categoryName,
+                            company
+                        )
+                        .orElseGet(() -> {
+
+                            Category newCategory =
+                                new Category();
+
+                            newCategory.setName(categoryName);
+                            newCategory.setCompany(company);
+
+                            return categoryRepository
+                                .save(newCategory);
+                        });
+                }
+
+                var existingProduct =
+                    productRepository
+                        .findByNameIgnoreCaseAndCompanyId(
+                            name,
+                            companyId
+                        );
+
+                Product product;
+
+                if (existingProduct.isPresent()) {
+
+                    product = existingProduct.get();
+
+                    // SUMA STOCK
+                    product.setStock(
+                        product.getStock() + stockToAdd
+                    );
+
+                    // ACTUALIZA PRECIO
+                    product.setPrice(price);
+
+                    // ACTUALIZA CATEGORÍA
+                    product.setCategory(category);
+
+                    // ACTUALIZA DESCRIPCIÓN SOLO SI VIENE
+                    if (!description.isEmpty()) {
+                        product.setDescripcion(description);
+                    }
+
+                    updated++;
+
+                } else {
+
+                    product = new Product();
+
+                    product.setName(name);
+                    product.setPrice(price);
+                    product.setStock(stockToAdd);
+                    product.setCompany(company);
+                    product.setCategory(category);
+                    product.setDescripcion(description);
+
+                    created++;
+                }
+
+                productRepository.save(product);
+            }
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                "Error importando productos: "
+                + e.getMessage()
+            );
+        }
+
+        return "Productos creados: "
+            + created
+            + " | Productos actualizados: "
+            + updated;
     }
 }

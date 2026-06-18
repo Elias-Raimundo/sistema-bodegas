@@ -2,10 +2,8 @@ package bodega_system.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-
 import java.security.Key;
 import java.util.Date;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +22,7 @@ public class JwtUtil {
                 .setSubject(userId.toString())
                 .claim("companyId", companyId)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 1 hora
+                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24)) 
                 .signWith(key)
                 .compact();
     }
