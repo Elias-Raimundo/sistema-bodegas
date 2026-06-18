@@ -1,11 +1,14 @@
 package bodega_system.controller;
 
 import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
 import bodega_system.dto.PreparedProductDTO;
 import bodega_system.entity.Company;
 import bodega_system.entity.PreparedProduct;
+import bodega_system.entity.PreparedProductIngredient;
 import bodega_system.entity.Product;
 import bodega_system.repository.CompanyRepository;
 import bodega_system.repository.PreparedProductRepository;
@@ -27,13 +30,10 @@ public class PreparedProductController {
 
     @GetMapping
     public List<PreparedProduct> getAll(HttpServletRequest request) {
+        Long companyId = (Long) request.getAttribute("companyId");
 
-        Long companyId =
-            (Long) request.getAttribute("companyId");
-
-        Company company =
-            companyRepository.findById(companyId)
-                .orElseThrow();
+        Company company = companyRepository.findById(companyId)
+            .orElseThrow();
 
         return preparedProductRepository.findByCompany(company);
     }
@@ -43,14 +43,11 @@ public class PreparedProductController {
             @RequestBody PreparedProductDTO dto,
             HttpServletRequest request) {
 
-        Long companyId =
-            (Long) request.getAttribute("companyId");
+        Long companyId = (Long) request.getAttribute("companyId");
 
-        Company company =
-            companyRepository.findById(companyId)
-                .orElseThrow();
+        Company company = companyRepository.findById(companyId)
+            .orElseThrow();
 
-        
         if (dto.name == null || dto.name.trim().isEmpty()) {
             throw new RuntimeException("El nombre es obligatorio");
         }
@@ -59,30 +56,39 @@ public class PreparedProductController {
             throw new RuntimeException("El precio no puede ser negativo");
         }
 
-        if (dto.servingsPerUnit == null || dto.servingsPerUnit <= 0) {
-            throw new RuntimeException("Los vasos por botella deben ser mayor a cero");
+        if (dto.ingredients == null || dto.ingredients.isEmpty()) {
+            throw new RuntimeException("Debe agregar al menos un ingrediente");
         }
 
-        if (dto.baseProductId == null) {
-            throw new RuntimeException("Debe seleccionar una botella base");
-        }
-
-        Product baseProduct =
-            productRepository.findById(dto.baseProductId)
-                .orElseThrow();
-
-        if (!baseProduct.getCompany().getId().equals(company.getId())) {
-            throw new RuntimeException("Producto base no autorizado");
-        }
-
-        PreparedProduct preparedProduct =
-            new PreparedProduct();
-
+        PreparedProduct preparedProduct = new PreparedProduct();
         preparedProduct.setName(dto.name.trim());
         preparedProduct.setPrice(dto.price);
-        preparedProduct.setServingsPerUnit(dto.servingsPerUnit);
-        preparedProduct.setBaseProduct(baseProduct);
         preparedProduct.setCompany(company);
+
+        for (PreparedProductDTO.IngredientDTO ingredientDTO : dto.ingredients) {
+
+            if (ingredientDTO.productId == null) {
+                throw new RuntimeException("Ingrediente sin producto");
+            }
+
+            if (ingredientDTO.quantity == null || ingredientDTO.quantity <= 0) {
+                throw new RuntimeException("La cantidad del ingrediente debe ser mayor a cero");
+            }
+
+            Product product = productRepository.findById(ingredientDTO.productId)
+                .orElseThrow();
+
+            if (!product.getCompany().getId().equals(company.getId())) {
+                throw new RuntimeException("Producto ingrediente no autorizado");
+            }
+
+            PreparedProductIngredient ingredient = new PreparedProductIngredient();
+            ingredient.setProduct(product);
+            ingredient.setQuantity(ingredientDTO.quantity);
+            ingredient.setPreparedProduct(preparedProduct);
+
+            preparedProduct.getIngredients().add(ingredient);
+        }
 
         return preparedProductRepository.save(preparedProduct);
     }
@@ -93,16 +99,13 @@ public class PreparedProductController {
             @RequestBody PreparedProductDTO dto,
             HttpServletRequest request) {
 
-        Long companyId =
-            (Long) request.getAttribute("companyId");
+        Long companyId = (Long) request.getAttribute("companyId");
 
-        Company company =
-            companyRepository.findById(companyId)
-                .orElseThrow();
+        Company company = companyRepository.findById(companyId)
+            .orElseThrow();
 
-        PreparedProduct preparedProduct =
-            preparedProductRepository.findById(id)
-                .orElseThrow();
+        PreparedProduct preparedProduct = preparedProductRepository.findById(id)
+            .orElseThrow();
 
         if (!preparedProduct.getCompany().getId().equals(company.getId())) {
             throw new RuntimeException("No autorizado");
@@ -116,26 +119,39 @@ public class PreparedProductController {
             throw new RuntimeException("El precio no puede ser negativo");
         }
 
-        if (dto.servingsPerUnit == null || dto.servingsPerUnit <= 0) {
-            throw new RuntimeException("Los vasos por botella deben ser mayor a cero");
-        }
-
-        if (dto.baseProductId == null) {
-            throw new RuntimeException("Debe seleccionar una botella base");
-        }
-
-        Product baseProduct =
-            productRepository.findById(dto.baseProductId)
-                .orElseThrow();
-
-        if (!baseProduct.getCompany().getId().equals(company.getId())) {
-            throw new RuntimeException("Producto base no autorizado");
+        if (dto.ingredients == null || dto.ingredients.isEmpty()) {
+            throw new RuntimeException("Debe agregar al menos un ingrediente");
         }
 
         preparedProduct.setName(dto.name.trim());
         preparedProduct.setPrice(dto.price);
-        preparedProduct.setServingsPerUnit(dto.servingsPerUnit);
-        preparedProduct.setBaseProduct(baseProduct);
+
+        preparedProduct.getIngredients().clear();
+
+        for (PreparedProductDTO.IngredientDTO ingredientDTO : dto.ingredients) {
+
+            if (ingredientDTO.productId == null) {
+                throw new RuntimeException("Ingrediente sin producto");
+            }
+
+            if (ingredientDTO.quantity == null || ingredientDTO.quantity <= 0) {
+                throw new RuntimeException("La cantidad del ingrediente debe ser mayor a cero");
+            }
+
+            Product product = productRepository.findById(ingredientDTO.productId)
+                .orElseThrow();
+
+            if (!product.getCompany().getId().equals(company.getId())) {
+                throw new RuntimeException("Producto ingrediente no autorizado");
+            }
+
+            PreparedProductIngredient ingredient = new PreparedProductIngredient();
+            ingredient.setProduct(product);
+            ingredient.setQuantity(ingredientDTO.quantity);
+            ingredient.setPreparedProduct(preparedProduct);
+
+            preparedProduct.getIngredients().add(ingredient);
+        }
 
         return preparedProductRepository.save(preparedProduct);
     }
@@ -145,16 +161,13 @@ public class PreparedProductController {
             @PathVariable Long id,
             HttpServletRequest request) {
 
-        Long companyId =
-            (Long) request.getAttribute("companyId");
+        Long companyId = (Long) request.getAttribute("companyId");
 
-        Company company =
-            companyRepository.findById(companyId)
-                .orElseThrow();
+        Company company = companyRepository.findById(companyId)
+            .orElseThrow();
 
-        PreparedProduct preparedProduct =
-            preparedProductRepository.findById(id)
-                .orElseThrow();
+        PreparedProduct preparedProduct = preparedProductRepository.findById(id)
+            .orElseThrow();
 
         if (!preparedProduct.getCompany().getId().equals(company.getId())) {
             throw new RuntimeException("No autorizado");

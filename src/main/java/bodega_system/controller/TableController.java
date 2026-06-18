@@ -254,9 +254,9 @@ public class TableController {
                 (
                     itemType.equals("PRODUCT")
                         ? i.getProductId() != null &&
-                          i.getProductId().equals(dto.productId)
+                        i.getProductId().equals(dto.productId)
                         : i.getPreparedProductId() != null &&
-                          i.getPreparedProductId().equals(dto.preparedProductId)
+                        i.getPreparedProductId().equals(dto.preparedProductId)
                 )
             )
             .findFirst()
@@ -276,24 +276,20 @@ public class TableController {
                 throw new RuntimeException("Producto no autorizado");
             }
 
-            if (product.getStock() < dto.quantity) {
+            int finalQuantity =
+                existing != null
+                    ? existing.getQuantity() + dto.quantity
+                    : dto.quantity;
+
+            if (product.getStock() < finalQuantity) {
                 throw new RuntimeException(
                     "Stock insuficiente para " + product.getName()
                 );
             }
 
             if (existing != null) {
-                int newQuantity = existing.getQuantity() + dto.quantity;
-
-                if (product.getStock() < newQuantity) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + product.getName()
-                    );
-                }
-
-                existing.setQuantity(newQuantity);
+                existing.setQuantity(finalQuantity);
                 tableOrderItemRepository.save(existing);
-
             } else {
                 TableOrderItem item = new TableOrderItem();
 
@@ -324,32 +320,36 @@ public class TableController {
                 throw new RuntimeException("Preparado no autorizado");
             }
 
-            Product baseProduct = prepared.getBaseProduct();
+            if (prepared.getIngredients() == null || prepared.getIngredients().isEmpty()) {
+                throw new RuntimeException("El preparado no tiene ingredientes");
+            }
 
-            double stockToDiscount =
-                dto.quantity / prepared.getServingsPerUnit();
+            int finalQuantity =
+                existing != null
+                    ? existing.getQuantity() + dto.quantity
+                    : dto.quantity;
 
-            if (baseProduct.getStock() < stockToDiscount) {
-                throw new RuntimeException(
-                    "Stock insuficiente para " + baseProduct.getName()
-                );
+            for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
+
+                Product product = ingredient.getProduct();
+
+                if (!product.getCompany().getId().equals(companyId)) {
+                    throw new RuntimeException("Ingrediente no autorizado");
+                }
+
+                double stockToDiscount =
+                    ingredient.getQuantity() * finalQuantity;
+
+                if (product.getStock() < stockToDiscount) {
+                    throw new RuntimeException(
+                        "Stock insuficiente para " + product.getName()
+                    );
+                }
             }
 
             if (existing != null) {
-                int newQuantity = existing.getQuantity() + dto.quantity;
-
-                double newStockToDiscount =
-                    newQuantity / prepared.getServingsPerUnit();
-
-                if (baseProduct.getStock() < newStockToDiscount) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + baseProduct.getName()
-                    );
-                }
-
-                existing.setQuantity(newQuantity);
+                existing.setQuantity(finalQuantity);
                 tableOrderItemRepository.save(existing);
-
             } else {
                 TableOrderItem item = new TableOrderItem();
 
@@ -403,6 +403,7 @@ public class TableController {
         } else {
 
             if (item.getItemType().equals("PRODUCT")) {
+
                 Product product = productRepository
                     .findById(item.getProductId())
                     .orElseThrow();
@@ -419,6 +420,7 @@ public class TableController {
             }
 
             if (item.getItemType().equals("PREPARED")) {
+
                 PreparedProduct prepared =
                     preparedProductRepository
                         .findById(item.getPreparedProductId())
@@ -428,15 +430,26 @@ public class TableController {
                     throw new RuntimeException("Preparado no autorizado");
                 }
 
-                Product baseProduct = prepared.getBaseProduct();
+                if (prepared.getIngredients() == null || prepared.getIngredients().isEmpty()) {
+                    throw new RuntimeException("El preparado no tiene ingredientes");
+                }
 
-                double stockToDiscount =
-                    quantity / prepared.getServingsPerUnit();
+                for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
 
-                if (baseProduct.getStock() < stockToDiscount) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + baseProduct.getName()
-                    );
+                    Product product = ingredient.getProduct();
+
+                    if (!product.getCompany().getId().equals(companyId)) {
+                        throw new RuntimeException("Ingrediente no autorizado");
+                    }
+
+                    double stockToDiscount =
+                        ingredient.getQuantity() * quantity;
+
+                    if (product.getStock() < stockToDiscount) {
+                        throw new RuntimeException(
+                            "Stock insuficiente para " + product.getName()
+                        );
+                    }
                 }
             }
 
@@ -499,12 +512,10 @@ public class TableController {
         }
 
         Sale sale = new Sale();
-
         sale.setCreatedAt(LocalDateTime.now());
         sale.setCompany(company);
 
         List<SaleItem> saleItems = new ArrayList<>();
-
         double total = 0;
 
         for (TableOrderItem tableItem : order.getItems()) {
@@ -535,6 +546,61 @@ public class TableController {
                     );
                 }
 
+            } else if (tableItem.getItemType().equals("PREPARED")) {
+
+                PreparedProduct prepared =
+                    preparedProductRepository
+                        .findById(tableItem.getPreparedProductId())
+                        .orElseThrow();
+
+                if (!prepared.getCompany().getId().equals(companyId)) {
+                    throw new RuntimeException("Preparado no autorizado");
+                }
+
+                if (prepared.getIngredients() == null || prepared.getIngredients().isEmpty()) {
+                    throw new RuntimeException("El preparado no tiene ingredientes");
+                }
+
+                for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
+
+                    Product product = ingredient.getProduct();
+
+                    if (!product.getCompany().getId().equals(companyId)) {
+                        throw new RuntimeException("Ingrediente no autorizado");
+                    }
+
+                    double stockToDiscount =
+                        ingredient.getQuantity() * tableItem.getQuantity();
+
+                    if (product.getStock() < stockToDiscount) {
+                        throw new RuntimeException(
+                            "Stock insuficiente para " + product.getName()
+                        );
+                    }
+                }
+            }
+
+            total += tableItem.getQuantity() * tableItem.getPrice();
+            saleItems.add(saleItem);
+        }
+
+        double paymentsTotal = dto.payments
+            .stream()
+            .mapToDouble(SalePayment::getAmount)
+            .sum();
+
+        if (Math.abs(paymentsTotal - total) > 0.01) {
+            throw new RuntimeException("Los pagos no coinciden con el total");
+        }
+
+        for (TableOrderItem tableItem : order.getItems()) {
+
+            if (tableItem.getItemType().equals("PRODUCT")) {
+
+                Product product = productRepository
+                    .findById(tableItem.getProductId())
+                    .orElseThrow();
+
                 product.setStock(
                     product.getStock() - tableItem.getQuantity()
                 );
@@ -548,45 +614,21 @@ public class TableController {
                         .findById(tableItem.getPreparedProductId())
                         .orElseThrow();
 
-                if (!prepared.getCompany().getId().equals(companyId)) {
-                    throw new RuntimeException("Preparado no autorizado");
+                for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
+
+                    Product product = ingredient.getProduct();
+
+                    double stockToDiscount =
+                        ingredient.getQuantity() * tableItem.getQuantity();
+
+                    product.setStock(product.getStock() - stockToDiscount);
+                    productRepository.save(product);
                 }
-
-                Product baseProduct = prepared.getBaseProduct();
-
-                double stockToDiscount =
-                    tableItem.getQuantity()
-                    / prepared.getServingsPerUnit();
-
-                if (baseProduct.getStock() < stockToDiscount) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + baseProduct.getName()
-                    );
-                }
-
-                baseProduct.setStock(
-                    baseProduct.getStock() - stockToDiscount
-                );
-
-                productRepository.save(baseProduct);
             }
-
-            total += tableItem.getQuantity() * tableItem.getPrice();
-
-            saleItems.add(saleItem);
         }
 
         sale.setItems(saleItems);
         sale.setTotal(total);
-
-        double paymentsTotal = dto.payments
-            .stream()
-            .mapToDouble(SalePayment::getAmount)
-            .sum();
-
-        if (Math.abs(paymentsTotal - total) > 0.01) {
-            throw new RuntimeException("Los pagos no coinciden con el total");
-        }
 
         for (SalePayment payment : dto.payments) {
             payment.setSale(sale);

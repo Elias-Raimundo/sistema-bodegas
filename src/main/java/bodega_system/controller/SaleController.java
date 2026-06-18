@@ -77,27 +77,48 @@ public class SaleController {
 
                 total += item.getQuantity() * product.getPrice();
             }
-            if (itemType.equals("PREPARED")){
+            if (itemType.equals("PREPARED")) {
                 PreparedProduct prepared =
                         preparedProductRepository
                                 .findById(item.getPreparedProductId())
                                 .orElseThrow();
-                if (!prepared.getCompany().getId().equals(companyId)){
+
+                if (!prepared.getCompany().getId().equals(companyId)) {
                     throw new RuntimeException("Preparado no autorizado");
                 }
-                Product baseProduct = prepared.getBaseProduct();
-                double stockToDiscount =
-                        item.getQuantity() / prepared.getServingsPerUnit();
-                if (baseProduct.getStock() < stockToDiscount){
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + baseProduct.getName()
-                    );
+
+                if (prepared.getIngredients() == null || prepared.getIngredients().isEmpty()) {
+                    throw new RuntimeException("El preparado no tiene ingredientes");
                 }
 
-                baseProduct.setStock(
-                    baseProduct.getStock() - stockToDiscount
-                );
-                productRepository.save(baseProduct);
+                for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
+
+                    Product product = ingredient.getProduct();
+
+                    if (!product.getCompany().getId().equals(companyId)) {
+                        throw new RuntimeException("Ingrediente no autorizado");
+                    }
+
+                    double stockToDiscount =
+                            ingredient.getQuantity() * item.getQuantity();
+
+                    if (product.getStock() < stockToDiscount) {
+                        throw new RuntimeException(
+                            "Stock insuficiente para " + product.getName()
+                        );
+                    }
+                }
+
+                for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
+
+                    Product product = ingredient.getProduct();
+
+                    double stockToDiscount =
+                            ingredient.getQuantity() * item.getQuantity();
+
+                    product.setStock(product.getStock() - stockToDiscount);
+                    productRepository.save(product);
+                }
 
                 item.setProductName(prepared.getName());
                 item.setPrice(prepared.getPrice());

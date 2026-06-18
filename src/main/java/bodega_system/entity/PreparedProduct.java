@@ -2,6 +2,9 @@ package bodega_system.entity;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 public class PreparedProduct {
 
@@ -10,11 +13,9 @@ public class PreparedProduct {
     private Long id;
     private String name;
     private Double price;
-    private Double servingsPerUnit;
-
-    @ManyToOne
-    @JoinColumn(name = "base_product_id")
-    private Product baseProduct;
+    
+    @OneToMany(mappedBy = "preparedProduct", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PreparedProductIngredient> ingredients = new ArrayList<>();
 
     @ManyToOne
     private Company company;
@@ -31,12 +32,8 @@ public class PreparedProduct {
         return price;
     }
 
-    public Double getServingsPerUnit() {
-        return servingsPerUnit;
-    }
-
-    public Product getBaseProduct() {
-        return baseProduct;
+    public List<PreparedProductIngredient> getIngredients(){
+        return ingredients;
     }
 
     public Company getCompany() {
@@ -55,12 +52,8 @@ public class PreparedProduct {
         this.price = price;
     }
 
-    public void setServingsPerUnit(Double servingsPerUnit) {
-        this.servingsPerUnit = servingsPerUnit;
-    }
-
-    public void setBaseProduct(Product baseProduct) {
-        this.baseProduct = baseProduct;
+    public void setIngredients(List<PreparedProductIngredient> ingredients){
+        this.ingredients = ingredients;
     }
 
     public void setCompany(Company company) {
