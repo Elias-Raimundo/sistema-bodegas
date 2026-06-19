@@ -516,7 +516,7 @@ public class TableController {
         sale.setCompany(company);
 
         List<SaleItem> saleItems = new ArrayList<>();
-        double total = 0;
+        double subtotal = 0;
 
         for (TableOrderItem tableItem : order.getItems()) {
 
@@ -580,9 +580,22 @@ public class TableController {
                 }
             }
 
-            total += tableItem.getQuantity() * tableItem.getPrice();
+            subtotal += tableItem.getQuantity() * tableItem.getPrice();
             saleItems.add(saleItem);
         }
+        double discount = 
+            dto.discount == null
+                ? 0
+                : dto.discount;
+        
+        if (discount < 0){
+            throw new RuntimeException("El descuento no puede ser negativo");
+        }
+        if (discount > subtotal){
+            throw new RuntimeException("El descuento no puede ser mayor al subtotal");
+        }
+
+        double total = subtotal - discount;
 
         double paymentsTotal = dto.payments
             .stream()
@@ -628,6 +641,8 @@ public class TableController {
         }
 
         sale.setItems(saleItems);
+        sale.setSubtotal(subtotal);
+        sale.setDiscount(discount);
         sale.setTotal(total);
 
         for (SalePayment payment : dto.payments) {

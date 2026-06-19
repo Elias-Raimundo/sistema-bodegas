@@ -13,8 +13,9 @@ public class Sale {
     private Long id;
 
     private LocalDateTime createdAt;
-
-    private double total;
+    private Double discount = 0.0;
+    private Double subtotal = 0.0;
+    private Double total = 0.0;
 
     @OneToMany(
         mappedBy = "sale",
@@ -34,6 +35,8 @@ public class Sale {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public Double getTotal() { return total; }
     public List<SaleItem> getItems() { return items; }
+    public Double getDiscount(){    return discount;    }
+    public Double getSubtotal(){    return subtotal; }
     public Company getCompany() { return company; }
     public List<SalePayment> getPayments(){
         return payments;
@@ -47,4 +50,6 @@ public class Sale {
     public void setPayments(List<SalePayment> payments) {
         this.payments = payments;
     }
+    public void setDiscount(Double discount) {  this.discount = discount;}
+    public void setSubtotal(Double subtotal){   this.subtotal =subtotal; }
 }

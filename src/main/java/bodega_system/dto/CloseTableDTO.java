@@ -5,4 +5,5 @@ import bodega_system.entity.SalePayment;
 
 public class CloseTableDTO{
     public List<SalePayment> payments;
+    public Double discount;
 }

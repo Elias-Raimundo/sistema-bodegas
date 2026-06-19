@@ -37,7 +37,7 @@ public class SaleController {
         Company company = new Company();
         company.setId(companyId);
 
-        double total = 0;
+        double subtotal = 0;
 
         sale.setCreatedAt(LocalDateTime.now());
         System.out.println("COMPANY ID: " + companyId);
@@ -75,7 +75,7 @@ public class SaleController {
                 item.setPrice(product.getPrice());
                 item.setItemType("PRODUCT");
 
-                total += item.getQuantity() * product.getPrice();
+                subtotal += item.getQuantity() * product.getPrice();
             }
             if (itemType.equals("PREPARED")) {
                 PreparedProduct prepared =
@@ -124,13 +124,28 @@ public class SaleController {
                 item.setPrice(prepared.getPrice());
                 item.setItemType("PREPARED");
 
-                total += item.getQuantity() * prepared.getPrice();
+                subtotal += item.getQuantity() * prepared.getPrice();
             }
 
             item.setSale(sale);
         }
 
+        sale.setSubtotal(subtotal);
+        double discount =
+            sale.getDiscount() == null
+                ? 0
+                : sale.getDiscount();
+        if (discount < 0){
+            throw new RuntimeException("El descuento no puede ser negativo");
+        }
+        if (discount > subtotal){
+            throw new RuntimeException("El descuento no puede ser mayor al subtotal");
+        }
+
+        double total = subtotal - discount;
+        sale.setDiscount(discount);
         sale.setTotal(total);
+        
         if (sale.getPayments() == null || sale.getPayments().isEmpty()){
             throw new RuntimeException("Debe registrar al menos un pago");
         }
