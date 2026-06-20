@@ -512,7 +512,7 @@ public class TableController {
         }
 
         Sale sale = new Sale();
-        sale.setCreatedAt(LocalDateTime.now());
+        sale.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
         sale.setCompany(company);
 
         List<SaleItem> saleItems = new ArrayList<>();

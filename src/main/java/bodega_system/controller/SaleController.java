@@ -39,7 +39,7 @@ public class SaleController {
 
         double subtotal = 0;
 
-        sale.setCreatedAt(LocalDateTime.now());
+        sale.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
         System.out.println("COMPANY ID: " + companyId);
         sale.setCompany(company);
 
