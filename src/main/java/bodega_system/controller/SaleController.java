@@ -2,7 +2,7 @@ package bodega_system.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.transaction.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +30,7 @@ public class SaleController {
     }
 
     @PostMapping
+    @Transactional
     public ResponseEntity<Void> create(@RequestBody Sale sale, HttpServletRequest req) {
 
         Long companyId = (Long) req.getAttribute("companyId");
@@ -168,7 +169,11 @@ public class SaleController {
             payment.setSale(sale);
         }
 
-        saleRepository.save(sale);
+        Sale savedSale = saleRepository.save(sale);
+        System.out.println("VENTA GUARDADA ID: " + savedSale.getId());
+        System.out.println("Descuento: " + savedSale.getDiscount());
+        System.out.println("Total: " + savedSale.getTotal());
+
         return ResponseEntity.ok().build();
     }
 

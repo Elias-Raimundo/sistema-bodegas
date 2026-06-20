@@ -19,7 +19,8 @@ public class Sale {
 
     @OneToMany(
         mappedBy = "sale",
-        cascade = CascadeType.ALL
+        cascade = CascadeType.ALL,
+        fetch = FetchType.EAGER
     )
     private List<SalePayment> payments;
 
