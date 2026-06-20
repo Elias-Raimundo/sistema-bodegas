@@ -51,9 +51,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
             Long userId = Long.parseLong(claims.getSubject());
             Long companyId = Long.parseLong(claims.get("companyId").toString());
-
-            System.out.println("CLAIMS:" + claims);
-            System.out.println("COMPANY CLAIM: " + claims.get("companyId"));
             
 
             UsernamePasswordAuthenticationToken auth =

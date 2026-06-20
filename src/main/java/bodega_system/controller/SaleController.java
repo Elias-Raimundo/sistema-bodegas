@@ -31,7 +31,7 @@ public class SaleController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<Void> create(@RequestBody Sale sale, HttpServletRequest req) {
+    public ResponseEntity<?> create(@RequestBody Sale sale, HttpServletRequest req) {
 
         Long companyId = (Long) req.getAttribute("companyId");
 
@@ -170,11 +170,18 @@ public class SaleController {
         }
 
         Sale savedSale = saleRepository.save(sale);
-        System.out.println("VENTA GUARDADA ID: " + savedSale.getId());
-        System.out.println("Descuento: " + savedSale.getDiscount());
-        System.out.println("Total: " + savedSale.getTotal());
 
-        return ResponseEntity.ok().build();
+        if (savedSale.getId() == null) {
+            throw new RuntimeException("La venta no se realizo");
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", savedSale.getId());
+        response.put("subtotal", savedSale.getSubtotal());
+        response.put("discount", savedSale.getDiscount());
+        response.put("total", savedSale.getTotal());
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
