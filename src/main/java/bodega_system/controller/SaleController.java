@@ -237,6 +237,18 @@ public class SaleController {
         return sales;
     }
 
+    @GetMapping("/{saleId}")
+    public Sale getById(@PathVariable Long saleId, HttpServletRequest request){
+        Long companyId = (Long) request.getAttribute("companyId");
+        Sale sale = saleRepository.findById(saleId)
+            .orElseThrow();
+        if (!sale.getCompany().getId().equals(companyId)){
+            throw new RuntimeException("Venta no autorizada");
+        }
+        return sale;
+    }
+    
+
     @GetMapping("/payment-stats")
     public Map<String, Double> paymentStats(HttpServletRequest request) {
 
