@@ -8,5 +8,7 @@ import bodega_system.entity.Sale;
 
 public interface SaleRepository extends JpaRepository<Sale, Long>{
     List<Sale> findByCompany_IdOrderByCreatedAtDesc(Long companyId);
+
+    List<Sale> findByCustomerId(Long customerId);
     
 }

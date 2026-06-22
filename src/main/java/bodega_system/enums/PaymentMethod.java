@@ -4,5 +4,6 @@ public enum PaymentMethod {
     CASH,
     TRANSFER,
     DEBIT,
-    CREDIT
+    CREDIT,
+    CURRENT_ACCOUNT
 }

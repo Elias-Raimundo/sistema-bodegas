@@ -17,6 +17,8 @@ public class Sale {
     private Double subtotal = 0.0;
     private Double total = 0.0;
 
+    private Long customerId;
+
     @OneToMany(
         mappedBy = "sale",
         cascade = CascadeType.ALL,
@@ -42,6 +44,7 @@ public class Sale {
     public List<SalePayment> getPayments(){
         return payments;
     }
+    public Long getCustomerId(){    return customerId; }
 
     public void setId(Long id) { this.id = id; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
@@ -53,4 +56,5 @@ public class Sale {
     }
     public void setDiscount(Double discount) {  this.discount = discount;}
     public void setSubtotal(Double subtotal){   this.subtotal =subtotal; }
+    public void setCustomerId(Long customerId){ this.customerId = customerId; }
 }

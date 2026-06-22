@@ -22,11 +22,20 @@ public class SaleController {
     private final SaleRepository saleRepository;
     private final ProductRepository productRepository;
     private final PreparedProductRepository preparedProductRepository;
+    private final CustomerRepository customerRepository;
+    private final CustomerMovementRepository customerMovementRepository;
 
-    public SaleController(SaleRepository saleRepository, ProductRepository productRepository, PreparedProductRepository preparedProductRepository) {
+    public SaleController(SaleRepository saleRepository, 
+        ProductRepository productRepository, 
+        PreparedProductRepository preparedProductRepository,
+        CustomerRepository customerRepository,
+        CustomerMovementRepository customerMovementRepository
+    ) {
         this.saleRepository = saleRepository;
         this.productRepository = productRepository;
         this.preparedProductRepository = preparedProductRepository;
+        this.customerMovementRepository = customerMovementRepository;
+        this.customerRepository = customerRepository;
     }
 
     @PostMapping
@@ -156,6 +165,16 @@ public class SaleController {
             }
         }
 
+        boolean isCurrentAccount = sale.getPayments()
+            .stream()
+            .anyMatch(payment ->
+                payment.getMethod() != null &&
+                payment.getMethod().name().equals("CURRENT_ACCOUNT")
+            );
+        if (isCurrentAccount && sale.getCustomerId() == null){
+            throw new RuntimeException("Debe seleccionar un cliente para cuenta corriente");
+        }
+
         double paymentsTotal = sale.getPayments()
             .stream()
             .mapToDouble(SalePayment::getAmount)
@@ -173,6 +192,32 @@ public class SaleController {
 
         if (savedSale.getId() == null) {
             throw new RuntimeException("La venta no se realizo");
+        }
+
+        if(isCurrentAccount){
+            Customer customer = customerRepository.findById(sale.getCustomerId())
+                .orElseThrow();
+            if (!customer.getCompany().getId().equals(companyId)) {
+                throw new RuntimeException("Cliente no autorizado");
+            }
+
+            CustomerMovement movement = new CustomerMovement();
+
+            movement.setCustomer(customer);
+            movement.setSaleId(savedSale.getId());
+            movement.setType("DEBT");
+            movement.setAmount(savedSale.getTotal());
+            movement.setDescription("Venta #" + savedSale.getId());
+            movement.setCreatedAt( LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+
+            customerMovementRepository.save(movement);
+            customer.setBalance(
+                (customer.getBalance() == null ? 0 : customer.getBalance())
+                + savedSale.getTotal()
+            );
+
+            customerRepository.save(customer);
+
         }
 
         Map<String, Object> response = new HashMap<>();
