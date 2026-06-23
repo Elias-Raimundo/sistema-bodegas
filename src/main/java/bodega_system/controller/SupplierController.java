@@ -60,6 +60,55 @@ public class SupplierController {
         return invoiceRepository.findBySupplier_Company_IdOrderByInvoiceDateDesc(companyId);
     }
 
+    @PutMapping("/{supplierId}")
+    public Supplier updateSupplier(
+        @PathVariable Long supplierId,
+        @RequestBody Supplier data,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        Supplier supplier = supplierRepository.findById(supplierId)
+            .orElseThrow();
+
+        if (!supplier.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("Proveedor no autorizado");
+        }
+
+        if (data.getName() == null || data.getName().trim().isEmpty()) {
+            throw new RuntimeException("El nombre del proveedor es obligatorio");
+        }
+
+        supplier.setName(data.getName().trim());
+        supplier.setDescription(data.getDescription());
+
+        return supplierRepository.save(supplier);
+    }
+
+    @DeleteMapping("/{supplierId}")
+    public void deleteSupplier(
+        @PathVariable Long supplierId,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        Supplier supplier = supplierRepository.findById(supplierId)
+            .orElseThrow();
+
+        if (!supplier.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("Proveedor no autorizado");
+        }
+
+        List<SupplierInvoice> invoices =
+            invoiceRepository.findBySupplier_IdOrderByInvoiceDateDesc(supplierId);
+
+        if (!invoices.isEmpty()) {
+            throw new RuntimeException("No se puede eliminar un proveedor con facturas cargadas");
+        }
+
+        supplierRepository.delete(supplier);
+    }
+
     @GetMapping("/{supplierId}/invoices")
     public List<SupplierInvoice> getInvoicesBySupplier(
         @PathVariable Long supplierId,
