@@ -30,7 +30,17 @@ public class SupplierController {
     public List<Supplier> getAll(HttpServletRequest request) {
         Long companyId = (Long) request.getAttribute("companyId");
 
-        return supplierRepository.findByCompany_IdOrderByNameAsc(companyId);
+        List<Supplier> suppliers = 
+            supplierRepository.findByCompany_IdOrderByNameAsc(companyId);
+        for (Supplier supplier: suppliers){
+            double pending = invoiceRepository
+                .findBySupplier_IdOrderByInvoiceDateDesc(supplier.getId())
+                .stream()
+                .mapToDouble(SupplierInvoice::getPendingAmount)
+                .sum();
+            supplier.setPendingTotal(pending);
+        }
+        return suppliers;
     }
 
     @PostMapping
