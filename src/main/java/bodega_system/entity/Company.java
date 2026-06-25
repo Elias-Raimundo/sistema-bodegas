@@ -15,7 +15,7 @@ public class Company {
     private String primaryColor;
     private Boolean darkMode;
 
-    @Lob
+
     @Column(columnDefinition = "TEXT")
     private String logo;
 
