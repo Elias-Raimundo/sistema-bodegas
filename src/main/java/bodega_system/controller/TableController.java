@@ -23,6 +23,8 @@ public class TableController {
     private final ProductRepository productRepository;
     private final PreparedProductRepository preparedProductRepository;
     private final SaleRepository saleRepository;
+    private final CustomerRepository customerRepository;
+    private final CustomerMovementRepository customerMovementRepository;
 
     public TableController(
         TableBarRepository tableBarRepository,
@@ -30,7 +32,9 @@ public class TableController {
         TableOrderItemRepository tableOrderItemRepository,
         ProductRepository productRepository,
         PreparedProductRepository preparedProductRepository,
-        SaleRepository saleRepository
+        SaleRepository saleRepository,
+        CustomerRepository customerRepository,
+        CustomerMovementRepository customerMovementRepository
     ) {
         this.tableBarRepository = tableBarRepository;
         this.tableOrderRepository = tableOrderRepository;
@@ -38,6 +42,8 @@ public class TableController {
         this.productRepository = productRepository;
         this.preparedProductRepository = preparedProductRepository;
         this.saleRepository = saleRepository;
+        this.customerRepository = customerRepository;
+        this.customerMovementRepository = customerMovementRepository;
     }
 
     @PostMapping("/init")
@@ -652,6 +658,45 @@ public class TableController {
         sale.setPayments(dto.payments);
 
         saleRepository.save(sale);
+
+        boolean isCurrentAccount = dto.payments
+            .stream()
+            .anyMatch(p -> p.getMethod() != null && 
+                    p.getMethod().name().equals("CURRENT_ACCOUNT"));
+
+        if (isCurrentAccount) {
+            if (dto.customerId == null) {
+                throw new RuntimeException("Debe seleccionar un cliente para cuenta corriente");
+            }
+
+            Customer customer = customerRepository.findById(dto.customerId)
+                .orElseThrow();
+
+            if (!customer.getCompany().getId().equals(companyId)) {
+                throw new RuntimeException("Cliente no autorizado");
+            }
+
+            double currentAccountAmount = dto.payments
+                .stream()
+                .filter(p -> p.getMethod().name().equals("CURRENT_ACCOUNT"))
+                .mapToDouble(SalePayment::getAmount)
+                .sum();
+
+            CustomerMovement movement = new CustomerMovement();
+            movement.setCustomer(customer);
+            movement.setSaleId(sale.getId());
+            movement.setType("DEBT");
+            movement.setAmount(currentAccountAmount);
+            movement.setDescription("Venta mesa #" + table.getName() + " - Venta #" + sale.getId());
+            movement.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+
+            customerMovementRepository.save(movement);
+            customer.setBalance(
+                (customer.getBalance() == null ? 0 : customer.getBalance())
+                + currentAccountAmount
+            );
+            customerRepository.save(customer);
+        }
 
         order.setClosed(true);
         tableOrderRepository.save(order);

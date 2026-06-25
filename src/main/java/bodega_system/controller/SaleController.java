@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+
 import bodega_system.dto.SalesReportDTO;
 import bodega_system.dto.SalesStatsDTO;
 import bodega_system.entity.*;
@@ -194,30 +196,33 @@ public class SaleController {
             throw new RuntimeException("La venta no se realizo");
         }
 
-        if(isCurrentAccount){
+        if (isCurrentAccount) {
             Customer customer = customerRepository.findById(sale.getCustomerId())
                 .orElseThrow();
             if (!customer.getCompany().getId().equals(companyId)) {
                 throw new RuntimeException("Cliente no autorizado");
             }
 
-            CustomerMovement movement = new CustomerMovement();
+            double currentAccountAmount = sale.getPayments()
+                .stream()
+                .filter(p -> p.getMethod().name().equals("CURRENT_ACCOUNT"))
+                .mapToDouble(SalePayment::getAmount)
+                .sum();
 
+            CustomerMovement movement = new CustomerMovement();
             movement.setCustomer(customer);
             movement.setSaleId(savedSale.getId());
             movement.setType("DEBT");
-            movement.setAmount(savedSale.getTotal());
+            movement.setAmount(currentAccountAmount);
             movement.setDescription("Venta #" + savedSale.getId());
-            movement.setCreatedAt( LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+            movement.setCreatedAt(LocalDateTime.now(ZoneId.of("America/Argentina/Buenos_Aires")));
 
             customerMovementRepository.save(movement);
             customer.setBalance(
                 (customer.getBalance() == null ? 0 : customer.getBalance())
-                + savedSale.getTotal()
+                + currentAccountAmount
             );
-
             customerRepository.save(customer);
-
         }
 
         Map<String, Object> response = new HashMap<>();

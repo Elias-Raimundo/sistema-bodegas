@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import bodega_system.entity.*;
@@ -231,5 +232,52 @@ public class CustomerController {
         double discount = sale.getDiscount() == null ? 0 : sale.getDiscount();
 
         return Math.max(subtotal - discount, 0);
+    }
+
+    @PutMapping("/{customerId}")
+    public Customer update(
+        @PathVariable Long customerId,
+        @RequestBody Customer updated,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        Customer customer = customerRepository.findById(customerId)
+            .orElseThrow();
+
+        if (!customer.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("Cliente no autorizado");
+        }
+
+        if (updated.getName() == null || updated.getName().trim().isEmpty()) {
+            throw new RuntimeException("El nombre es obligatorio");
+        }
+
+        customer.setName(updated.getName().trim());
+
+        return customerRepository.save(customer);
+    }
+
+    @DeleteMapping("/{customerId}")
+    public ResponseEntity<Void> delete(
+        @PathVariable Long customerId,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        Customer customer = customerRepository.findById(customerId)
+            .orElseThrow();
+
+        if (!customer.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("Cliente no autorizado");
+        }
+
+        movementRepository.deleteAll(
+            movementRepository.findByCustomer_IdOrderByCreatedAtDesc(customerId)
+        );
+
+        customerRepository.delete(customer);
+
+        return ResponseEntity.ok().build();
     }
 }
