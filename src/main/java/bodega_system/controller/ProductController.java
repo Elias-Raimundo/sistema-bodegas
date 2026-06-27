@@ -118,15 +118,34 @@ public class ProductController {
 
     @GetMapping
     public List<Product> getAll(
-            @RequestParam(required = false) Long categoryId,
-            HttpServletRequest request) {
-
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) String search,
+        @RequestParam(defaultValue = "50") int limit,
+        HttpServletRequest request
+    ) {
         Long companyId = (Long) request.getAttribute("companyId");
 
-        if (categoryId != null)
-                return productRepository.findByCompanyIdAndCategoryId(companyId, categoryId);
+        List<Product> products;
 
-        return productRepository.findByCompanyId(companyId);
+        if (search != null && !search.trim().isEmpty()) {
+            // Búsqueda por nombre — trae todos los que coincidan
+            products = productRepository
+                .findByCompany_IdAndNameContainingIgnoreCase(
+                    companyId, search.trim()
+                );
+        } else if (categoryId != null) {
+            products = productRepository
+                .findByCompanyIdAndCategoryId(companyId, categoryId);
+        } else {
+            // Sin búsqueda — trae los primeros N
+            products = productRepository
+                .findByCompanyId(companyId)
+                .stream()
+                .limit(limit)
+                .toList();
+        }
+
+        return products;
     }
 
     @GetMapping("/stats")
