@@ -125,27 +125,30 @@ public class ProductController {
     ) {
         Long companyId = (Long) request.getAttribute("companyId");
 
-        List<Product> products;
+        if (search != null && !search.trim().isEmpty() && categoryId != null) {
+            return productRepository
+                .findByCompany_IdAndNameContainingIgnoreCaseAndCategory_Id(
+                    companyId, search.trim(), categoryId
+                );
+        }
 
         if (search != null && !search.trim().isEmpty()) {
-            // Búsqueda por nombre — trae todos los que coincidan
-            products = productRepository
+            return productRepository
                 .findByCompany_IdAndNameContainingIgnoreCase(
                     companyId, search.trim()
                 );
-        } else if (categoryId != null) {
-            products = productRepository
-                .findByCompanyIdAndCategoryId(companyId, categoryId);
-        } else {
-            // Sin búsqueda — trae los primeros N
-            products = productRepository
-                .findByCompanyId(companyId)
-                .stream()
-                .limit(limit)
-                .toList();
         }
 
-        return products;
+        if (categoryId != null) {
+            return productRepository
+                .findByCompanyIdAndCategoryId(companyId, categoryId);
+        }
+
+        return productRepository
+            .findByCompanyId(companyId)
+            .stream()
+            .limit(limit)
+            .toList();
     }
 
     @GetMapping("/stats")
