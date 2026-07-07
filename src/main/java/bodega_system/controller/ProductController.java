@@ -120,7 +120,7 @@ public class ProductController {
     public List<Product> getAll(
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) String search,
-        @RequestParam(defaultValue = "30") int limit,
+        @RequestParam(defaultValue = "1000") int limit,
         HttpServletRequest request
     ) {
         Long companyId = (Long) request.getAttribute("companyId");
