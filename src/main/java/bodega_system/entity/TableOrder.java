@@ -1,9 +1,7 @@
 package bodega_system.entity;
 
 import java.util.List;
-
 import jakarta.persistence.*;
-
 
 @Entity
 public class TableOrder {
@@ -25,11 +23,26 @@ public class TableOrder {
     )
     private List<TableOrderItem> items;
 
+    @OneToMany(
+        mappedBy = "order",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true,
+        fetch = FetchType.EAGER
+    )
+    private List<TableOrderPayment> partialPayments;
+
     public List<TableOrderItem> getItems(){
         return items;
     }
     public void setItems(List<TableOrderItem> items){
         this.items = items;
+    }
+
+    public List<TableOrderPayment> getPartialPayments(){
+        return partialPayments;
+    }
+    public void setPartialPayments(List<TableOrderPayment> partialPayments){
+        this.partialPayments = partialPayments;
     }
 
     public void setTable (TableBar table){

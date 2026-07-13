@@ -6,7 +6,7 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import bodega_system.dto.PartialPaymentDTO;
 import bodega_system.dto.CloseTableDTO;
 import bodega_system.dto.TableItemDTO;
 import bodega_system.entity.*;
@@ -20,6 +20,7 @@ public class TableController {
     private final TableBarRepository tableBarRepository;
     private final TableOrderRepository tableOrderRepository;
     private final TableOrderItemRepository tableOrderItemRepository;
+    private final TableOrderPaymentRepository tableOrderPaymentRepository;
     private final ProductRepository productRepository;
     private final PreparedProductRepository preparedProductRepository;
     private final SaleRepository saleRepository;
@@ -30,6 +31,7 @@ public class TableController {
         TableBarRepository tableBarRepository,
         TableOrderRepository tableOrderRepository,
         TableOrderItemRepository tableOrderItemRepository,
+        TableOrderPaymentRepository tableOrderPaymentRepository,
         ProductRepository productRepository,
         PreparedProductRepository preparedProductRepository,
         SaleRepository saleRepository,
@@ -39,6 +41,7 @@ public class TableController {
         this.tableBarRepository = tableBarRepository;
         this.tableOrderRepository = tableOrderRepository;
         this.tableOrderItemRepository = tableOrderItemRepository;
+        this.tableOrderPaymentRepository = tableOrderPaymentRepository;
         this.productRepository = productRepository;
         this.preparedProductRepository = preparedProductRepository;
         this.saleRepository = saleRepository;
@@ -481,6 +484,92 @@ public class TableController {
         return updatedOrder;
     }
 
+    @PostMapping("/{tableId}/partial-payment")
+    public TableOrder addPartialPayment(
+        @PathVariable Long tableId,
+        @RequestBody PartialPaymentDTO dto,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        TableBar table = tableBarRepository.findById(tableId).orElseThrow();
+
+        if (!table.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("No autorizado");
+        }
+
+        TableOrder order = tableOrderRepository
+            .findByTableAndClosedFalse(table)
+            .orElseThrow();
+
+        if (dto.amount == null || dto.amount <= 0) {
+            throw new RuntimeException("El importe debe ser mayor a cero");
+        }
+
+        if (dto.method == null) {
+            throw new RuntimeException("Debe seleccionar un método de pago");
+        }
+
+        double rawTotal = order.getItems().stream()
+            .mapToDouble(i -> i.getPrice() * i.getQuantity())
+            .sum();
+
+        double alreadyPaid = order.getPartialPayments() == null
+            ? 0
+            : order.getPartialPayments().stream()
+                .mapToDouble(TableOrderPayment::getAmount)
+                .sum();
+
+        double remaining = rawTotal - alreadyPaid;
+
+        if (dto.amount > remaining + 0.01) {
+            throw new RuntimeException(
+                "El monto supera el saldo pendiente ($" + remaining + ")"
+            );
+        }
+
+        if (dto.method.name().equals("CURRENT_ACCOUNT")) {
+
+            if (dto.customerId == null) {
+                throw new RuntimeException("Debe seleccionar un cliente para cuenta corriente");
+            }
+
+            Customer customer = customerRepository.findById(dto.customerId).orElseThrow();
+
+            if (!customer.getCompany().getId().equals(companyId)) {
+                throw new RuntimeException("Cliente no autorizado");
+            }
+
+            CustomerMovement movement = new CustomerMovement();
+            movement.setCustomer(customer);
+            movement.setSaleId(null);
+            movement.setType("DEBT");
+            movement.setAmount(dto.amount);
+            movement.setDescription("Pago parcial - Mesa " + table.getName());
+            movement.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+
+            customerMovementRepository.save(movement);
+
+            customer.setBalance(
+                (customer.getBalance() == null ? 0 : customer.getBalance()) + dto.amount
+            );
+            customerRepository.save(customer);
+        }
+
+        TableOrderPayment payment = new TableOrderPayment();
+        payment.setOrder(order);
+        payment.setAmount(dto.amount);
+        payment.setMethod(dto.method);
+        payment.setCustomerId(
+            dto.method.name().equals("CURRENT_ACCOUNT") ? dto.customerId : null
+        );
+        payment.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+
+        tableOrderPaymentRepository.save(payment);
+
+        return tableOrderRepository.findById(order.getId()).orElseThrow();
+    }
+
     @PostMapping("/{tableId}/close")
     public ResponseEntity<Void> closeTable(
         @PathVariable Long tableId,
@@ -601,16 +690,31 @@ public class TableController {
             throw new RuntimeException("El descuento no puede ser mayor al subtotal");
         }
 
+        
+
         double total = subtotal - discount;
+
+        double alreadyPaid = order.getPartialPayments() == null
+            ? 0
+            : order.getPartialPayments().stream()
+                .mapToDouble(TableOrderPayment::getAmount)
+                .sum();
+        
+        if (discount > (subtotal - alreadyPaid)) {
+            throw new RuntimeException("El descuento no puede ser mayor al saldo aún no pagado");
+        }
+
+        double remaining = total - alreadyPaid;
 
         double paymentsTotal = dto.payments
             .stream()
             .mapToDouble(SalePayment::getAmount)
             .sum();
 
-        if (Math.abs(paymentsTotal - total) > 0.01) {
-            throw new RuntimeException("Los pagos no coinciden con el total");
+        if (Math.abs(paymentsTotal - remaining) > 0.01) {
+            throw new RuntimeException("Los pagos no coinciden con el saldo pendiente ($" + remaining + ")");
         }
+
 
         for (TableOrderItem tableItem : order.getItems()) {
 
@@ -651,11 +755,24 @@ public class TableController {
         sale.setDiscount(discount);
         sale.setTotal(total);
 
-        for (SalePayment payment : dto.payments) {
-            payment.setSale(sale);
+        List<SalePayment> allPayments = new ArrayList<>();
+
+        if (order.getPartialPayments() != null) {
+            for (TableOrderPayment pp : order.getPartialPayments()) {
+                SalePayment sp = new SalePayment();
+                sp.setMethod(pp.getMethod());
+                sp.setAmount(pp.getAmount());
+                sp.setSale(sale);
+                allPayments.add(sp);
+            }
         }
 
-        sale.setPayments(dto.payments);
+        for (SalePayment payment : dto.payments) {
+            payment.setSale(sale);
+            allPayments.add(payment);
+        }
+
+        sale.setPayments(allPayments);
 
         saleRepository.save(sale);
 
