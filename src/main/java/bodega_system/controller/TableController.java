@@ -572,10 +572,15 @@ public class TableController {
 
         tableOrderPaymentRepository.save(payment);
 
-        TableOrder finalOrder = tableOrderRepository.findById(order.getId()).orElseThrow();
-        refreshItemPrices(finalOrder, companyId);
+        if (order.getPartialPayments() == null) {
+            order.setPartialPayments(new ArrayList<>());
+        }
+        order.getPartialPayments().add(payment);
 
-        return finalOrder;
+
+        refreshItemPrices(order, companyId);
+
+        return order;
     }
 
     @PostMapping("/{tableId}/close")
