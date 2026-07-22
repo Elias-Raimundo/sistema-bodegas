@@ -162,17 +162,19 @@ public class TableController {
             throw new RuntimeException("No autorizado");
         }
 
-        return tableOrderRepository
+        TableOrder order = tableOrderRepository
             .findByTableAndClosedFalse(table)
             .orElseGet(() -> {
-                TableOrder order = new TableOrder();
-
-                order.setTable(table);
-                order.setClosed(false);
-                order.setItems(new ArrayList<>());
-
-                return tableOrderRepository.save(order);
+                TableOrder newOrder = new TableOrder();
+                newOrder.setTable(table);
+                newOrder.setClosed(false);
+                newOrder.setItems(new ArrayList<>());
+                return tableOrderRepository.save(newOrder);
             });
+
+        refreshItemPrices(order, companyId);
+
+        return order;
     }
 
     @DeleteMapping("/items/{itemId}")
@@ -377,8 +379,10 @@ public class TableController {
         table.setOccupied(true);
         tableBarRepository.save(table);
 
-        return tableOrderRepository.findById(order.getId())
-            .orElseThrow();
+        TableOrder finalOrder = tableOrderRepository.findById(order.getId()).orElseThrow();
+        refreshItemPrices(finalOrder, companyId);
+
+        return finalOrder;
     }
 
     @PutMapping("/items/{itemId}/quantity")
@@ -480,6 +484,7 @@ public class TableController {
         }
 
         tableBarRepository.save(table);
+        refreshItemPrices(updatedOrder, companyId);
 
         return updatedOrder;
     }
@@ -567,7 +572,10 @@ public class TableController {
 
         tableOrderPaymentRepository.save(payment);
 
-        return tableOrderRepository.findById(order.getId()).orElseThrow();
+        TableOrder finalOrder = tableOrderRepository.findById(order.getId()).orElseThrow();
+        refreshItemPrices(finalOrder, companyId);
+
+        return finalOrder;
     }
 
     @PostMapping("/{tableId}/close")
@@ -822,5 +830,35 @@ public class TableController {
         tableBarRepository.save(table);
 
         return ResponseEntity.ok().build();
+    }
+
+    private void refreshItemPrices(TableOrder order, Long companyId) {
+        if (order.getItems() == null) return;
+
+        for (TableOrderItem item : order.getItems()) {
+
+            if (item.getItemType().equals("PRODUCT")) {
+
+                Product product = productRepository.findById(item.getProductId()).orElse(null);
+
+                if (product != null && product.getCompany().getId().equals(companyId)) {
+                    if (!product.getPrice().equals(item.getPrice())) {
+                        item.setPrice(product.getPrice());
+                        tableOrderItemRepository.save(item);
+                    }
+                }
+
+            } else if (item.getItemType().equals("PREPARED")) {
+
+                PreparedProduct prepared = preparedProductRepository.findById(item.getPreparedProductId()).orElse(null);
+
+                if (prepared != null && prepared.getCompany().getId().equals(companyId)) {
+                    if (!prepared.getPrice().equals(item.getPrice())) {
+                        item.setPrice(prepared.getPrice());
+                        tableOrderItemRepository.save(item);
+                    }
+                }
+            }
+        }
     }
 }
