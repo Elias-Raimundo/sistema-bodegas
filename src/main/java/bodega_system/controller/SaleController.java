@@ -360,7 +360,13 @@ public class SaleController {
                     s.getCreatedAt().isBefore(toDate)
                 )
                 .toList();
-
+        
+        for (Sale sale : sales) {
+            if (sale.getCustomerId() != null) {
+                customerRepository.findById(sale.getCustomerId())
+                    .ifPresent(c -> sale.setCustomerName(c.getName()));
+            }
+        }
         SalesReportDTO dto = new SalesReportDTO();
 
         dto.total = sales.stream()

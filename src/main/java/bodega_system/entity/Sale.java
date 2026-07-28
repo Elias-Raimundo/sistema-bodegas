@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
+import jakarta.persistence.Transient;
 
 @Entity
 public class Sale {
@@ -30,7 +31,10 @@ public class Sale {
     @JsonManagedReference
     private List<SaleItem> items;
 
-    
+    @Transient
+    private String customerName;
+
+
     @ManyToOne
     private Company company;
 
@@ -57,4 +61,7 @@ public class Sale {
     public void setDiscount(Double discount) {  this.discount = discount;}
     public void setSubtotal(Double subtotal){   this.subtotal =subtotal; }
     public void setCustomerId(Long customerId){ this.customerId = customerId; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
 }
