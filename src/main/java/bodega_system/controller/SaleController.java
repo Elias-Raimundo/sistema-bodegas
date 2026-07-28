@@ -352,14 +352,9 @@ public class SaleController {
             LocalDateTime.parse(to);
 
         List<Sale> sales =
-            saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId)
-                .stream()
-                .filter(s ->
-                    s.getCreatedAt() != null &&
-                    s.getCreatedAt().isAfter(fromDate) &&
-                    s.getCreatedAt().isBefore(toDate)
-                )
-                .toList();
+            saleRepository.findByCompany_IdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                companyId, fromDate, toDate
+            );
         
         for (Sale sale : sales) {
             if (sale.getCustomerId() != null) {
