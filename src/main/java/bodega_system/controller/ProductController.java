@@ -120,11 +120,18 @@ public class ProductController {
     public List<Product> getAll(
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) String search,
+        @RequestParam(required = false) Boolean lowStock,   
         @RequestParam(defaultValue = "1000") int limit,
         HttpServletRequest request
     ) {
         Long companyId = (Long) request.getAttribute("companyId");
 
+        if (Boolean.TRUE.equals(lowStock)) {
+            var pageable = org.springframework.data.domain.PageRequest.of(0, limit);
+            return productRepository.findByCompanyIdAndStockLessThanOrderByStockAsc(companyId, 5.0, pageable);
+        }
+
+        
         if (search != null && !search.trim().isEmpty() && categoryId != null) {
             return productRepository
                 .findByCompany_IdAndNameContainingIgnoreCaseAndCategory_Id(
@@ -156,23 +163,13 @@ public class ProductController {
 
         Long companyId = (Long) request.getAttribute("companyId");
 
-        var products = productRepository.findByCompanyId(companyId);
+        var products = productRepository.findByCompanyId(companyId);   // ⚠️ sigue trayendo TODO
 
         DashboardStats stats = new DashboardStats();
-
         stats.totalProducts = products.size();
-
-        stats.totalStock = products.stream()
-                .mapToDouble(p -> p.getStock())
-                .sum();
-
-        stats.lowStock = products.stream()
-                .filter(p -> p.getStock() < 5)
-                .count();
-
-        stats.inventoryValue = products.stream()
-                .mapToDouble(p -> p.getPrice() * Math.floor(p.getStock()))
-                .sum();
+        stats.totalStock = products.stream().mapToDouble(p -> p.getStock()).sum();
+        stats.lowStock = products.stream().filter(p -> p.getStock() < 5).count();
+        stats.inventoryValue = products.stream().mapToDouble(p -> p.getPrice() * Math.floor(p.getStock())).sum();
 
         return stats;
     }

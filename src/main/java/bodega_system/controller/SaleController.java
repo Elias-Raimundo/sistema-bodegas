@@ -235,8 +235,17 @@ public class SaleController {
     }
 
     @GetMapping
-    public List<Sale> getAll(HttpServletRequest req) {
+    public List<Sale> getAll(
+        @RequestParam(required = false) Integer limit,   
+        HttpServletRequest req
+    ) {
         Long companyId = (Long) req.getAttribute("companyId");
+
+        if (limit != null) {
+            var pageable = org.springframework.data.domain.PageRequest.of(0, limit);
+            return saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId, pageable);
+        }
+
         List<Sale> sales = saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
         System.out.println("Ventas: " + sales.size());
         return sales;
@@ -289,48 +298,17 @@ public class SaleController {
 
     @GetMapping("/stats")
     public SalesStatsDTO stats(HttpServletRequest request) {
+        Long companyId = (Long) request.getAttribute("companyId");
 
-        Long companyId =
-            (Long) request.getAttribute("companyId");
-
-        List<Sale> sales =
-            saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
-
-        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
 
         SalesStatsDTO dto = new SalesStatsDTO();
-
-        dto.today = sales.stream()
-            .filter(s ->
-                s.getCreatedAt() != null &&
-                s.getCreatedAt()
-                .toLocalDate()
-                .equals(today)
-            )
-            .mapToDouble(Sale::getTotal)
-            .sum();
-
-        dto.week = sales.stream()
-            .filter(s ->
-                s.getCreatedAt() != null &&
-                s.getCreatedAt()
-                .isAfter(LocalDateTime.now().minusDays(7))
-            )
-            .mapToDouble(Sale::getTotal)
-            .sum();
-
-        dto.month = sales.stream()
-            .filter(s ->
-                s.getCreatedAt() != null &&
-                s.getCreatedAt()
-                .isAfter(LocalDateTime.now().minusDays(30))
-            )
-            .mapToDouble(Sale::getTotal)
-            .sum();
-
-        dto.total = sales.stream()
-            .mapToDouble(Sale::getTotal)
-            .sum();
+        dto.today = saleRepository.sumTotalSince(companyId, startOfToday);
+        dto.week  = saleRepository.sumTotalSince(companyId, sevenDaysAgo);
+        dto.month = saleRepository.sumTotalSince(companyId, thirtyDaysAgo);
+        dto.total = saleRepository.sumTotalAll(companyId);
 
         return dto;
     }
