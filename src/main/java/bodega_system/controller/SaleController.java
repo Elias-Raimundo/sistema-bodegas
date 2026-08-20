@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import bodega_system.dto.SalesReportDTO;
 import bodega_system.dto.SalesStatsDTO;
 import bodega_system.entity.*;
+import bodega_system.enums.PaymentMethod;
 import bodega_system.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -265,31 +266,23 @@ public class SaleController {
 
     @GetMapping("/payment-stats")
     public Map<String, Double> paymentStats(HttpServletRequest request) {
-
         Long companyId = (Long) request.getAttribute("companyId");
 
-        List<Sale> sales =
-            saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
-
         Map<String, Double> stats = new HashMap<>();
-
         stats.put("cash", 0.0);
         stats.put("transfer", 0.0);
         stats.put("debit", 0.0);
         stats.put("credit", 0.0);
 
-        for (Sale sale : sales) {
-            if (sale.getPayments() == null) continue;
-
-            for (SalePayment payment : sale.getPayments()) {
-                
-                switch (payment.getMethod()) {
-                    case CASH -> stats.put("cash",stats.get("cash") + payment.getAmount());
-                    case TRANSFER -> stats.put("transfer", stats.get("transfer") + payment.getAmount());
-                    case DEBIT -> stats.put("debit", stats.get("debit") + payment.getAmount());
-                    case CREDIT -> stats.put("credit", stats.get("credit") + payment.getAmount());
-                        
-                }
+        for (Object[] row : saleRepository.sumPaymentsByMethod(companyId)) {
+            PaymentMethod method = (PaymentMethod) row[0];
+            double amount = ((Number) row[1]).doubleValue();
+            switch (method) {
+                case CASH -> stats.put("cash", amount);
+                case TRANSFER -> stats.put("transfer", amount);
+                case DEBIT -> stats.put("debit", amount);
+                case CREDIT -> stats.put("credit", amount);
+                default -> {}
             }
         }
 

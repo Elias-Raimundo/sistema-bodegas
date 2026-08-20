@@ -2,9 +2,7 @@ package bodega_system.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
 import org.springframework.data.jpa.repository.JpaRepository;
-
 import bodega_system.entity.Sale;
 
 public interface SaleRepository extends JpaRepository<Sale, Long>{
@@ -38,4 +36,15 @@ public interface SaleRepository extends JpaRepository<Sale, Long>{
         "SELECT COALESCE(SUM(s.total), 0) FROM Sale s WHERE s.company.id = :companyId"
     )
     double sumTotalAll(@org.springframework.data.repository.query.Param("companyId") Long companyId);
+
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT sp.method, COALESCE(SUM(sp.amount), 0) " +
+        "FROM Sale s JOIN s.payments sp " +
+        "WHERE s.company.id = :companyId " +
+        "GROUP BY sp.method"
+    )
+    List<Object[]> sumPaymentsByMethod(
+        @org.springframework.data.repository.query.Param("companyId") Long companyId
+    );
 }
