@@ -30,7 +30,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>{
     long countByCompanyIdAndStockLessThan(Long companyId, Double stock);
 
     @org.springframework.data.jpa.repository.Query(
-        "SELECT COUNT(p), COALESCE(SUM(p.stock),0), COALESCE(SUM(p.price * FLOOR(p.stock)),0) " +
+        "SELECT COUNT(p), COALESCE(SUM(p.stock),0), " +
+        "COALESCE(SUM(p.price * FLOOR(p.stock)),0), " +
+        "COALESCE(SUM(p.costPrice * FLOOR(p.stock)),0) " +
         "FROM Product p WHERE p.company.id = :companyId"
     )
     Object[] getInventorySummary(@org.springframework.data.repository.query.Param("companyId") Long companyId);

@@ -63,6 +63,7 @@ public class PreparedProductController {
         PreparedProduct preparedProduct = new PreparedProduct();
         preparedProduct.setName(dto.name.trim());
         preparedProduct.setPrice(dto.price);
+        preparedProduct.setCostPrice(dto.costPrice != null ? dto.costPrice : 0.0);
         preparedProduct.setCompany(company);
 
         for (PreparedProductDTO.IngredientDTO ingredientDTO : dto.ingredients) {
@@ -125,7 +126,7 @@ public class PreparedProductController {
 
         preparedProduct.setName(dto.name.trim());
         preparedProduct.setPrice(dto.price);
-
+        preparedProduct.setCostPrice(dto.costPrice != null ? dto.costPrice : 0.0);
         preparedProduct.getIngredients().clear();
 
         for (PreparedProductDTO.IngredientDTO ingredientDTO : dto.ingredients) {

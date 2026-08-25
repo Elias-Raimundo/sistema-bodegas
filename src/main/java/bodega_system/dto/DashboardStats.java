@@ -5,4 +5,5 @@ public class DashboardStats {
     public Double totalStock;
     public long lowStock;
     public double inventoryValue;
+    public double costValue;
 }

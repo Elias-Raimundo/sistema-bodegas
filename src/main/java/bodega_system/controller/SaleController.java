@@ -86,6 +86,7 @@ public class SaleController {
 
                 item.setProductName(product.getName());
                 item.setPrice(product.getPrice());
+                item.setCostPrice(product.getCostPrice() != null ? product.getCostPrice() : 0.0);
                 item.setItemType("PRODUCT");
 
                 subtotal += item.getQuantity() * product.getPrice();
@@ -135,6 +136,7 @@ public class SaleController {
 
                 item.setProductName(prepared.getName());
                 item.setPrice(prepared.getPrice());
+                item.setCostPrice(prepared.getCostPrice() != null ? prepared.getCostPrice() : 0.0);
                 item.setItemType("PREPARED");
 
                 subtotal += item.getQuantity() * prepared.getPrice();
@@ -350,10 +352,14 @@ public class SaleController {
 
         dto.salesCount = (long) sales.size();
 
-        dto.averageTicket =
-            dto.salesCount > 0
-                ? dto.total / dto.salesCount
-                : 0;
+        dto.totalProfit = sales.stream()
+            .mapToDouble(sale -> {
+                double saleCost = sale.getItems().stream()
+                    .mapToDouble(item -> item.getCostPrice() * item.getQuantity())
+                    .sum();
+                return sale.getTotal() - saleCost;
+            })
+            .sum();
 
         dto.productsSold = sales.stream()
             .flatMap(s -> s.getItems().stream())

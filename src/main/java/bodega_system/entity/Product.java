@@ -11,6 +11,7 @@ public class Product {
 
     private String name;
     private Double price;
+    private Double costPrice = 0.0;
     private Double stock;
     private String description;
 
@@ -40,6 +41,14 @@ public class Product {
 
     public void setPrice(Double price ){
         this.price = price;
+    }
+
+    public Double getCostPrice(){
+        return costPrice;
+    }
+
+    public void setCostPrice(Double costPrice){
+        this.costPrice = costPrice;
     }
 
     public Double getStock(){

@@ -57,6 +57,7 @@ public class ProductController {
         Product product = new Product();
         product.setName(dto.name.trim());
         product.setPrice(dto.price);
+        product.setCostPrice(dto.costPrice != null ? dto.costPrice : 0.0);
         product.setStock(dto.stock);
         product.setDescripcion(dto.description);
         product.setCompany(company);
@@ -103,6 +104,7 @@ public class ProductController {
 
         product.setName(dto.name.trim());
         product.setPrice(dto.price);
+        product.setCostPrice(dto.costPrice != null ? dto.costPrice : 0.0);
         product.setStock(dto.stock);
 
         if (dto.categoryId != null){
@@ -170,6 +172,7 @@ public class ProductController {
         stats.totalStock = ((Number) row[1]).doubleValue();
         stats.lowStock = lowStockCount;
         stats.inventoryValue = ((Number) row[2]).doubleValue();
+        stats.costValue = ((Number) row[3]).doubleValue();
 
         return stats;
     }

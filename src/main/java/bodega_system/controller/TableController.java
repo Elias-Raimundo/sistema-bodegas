@@ -654,6 +654,7 @@ public class TableController {
                         "Stock insuficiente para " + product.getName()
                     );
                 }
+                saleItem.setCostPrice(product.getCostPrice() != null ? product.getCostPrice() : 0.0);
 
             } else if (tableItem.getItemType().equals("PREPARED")) {
 
@@ -687,6 +688,7 @@ public class TableController {
                         );
                     }
                 }
+                saleItem.setCostPrice(prepared.getCostPrice() != null ? prepared.getCostPrice() : 0.0);
             }
 
             subtotal += tableItem.getQuantity() * tableItem.getPrice();

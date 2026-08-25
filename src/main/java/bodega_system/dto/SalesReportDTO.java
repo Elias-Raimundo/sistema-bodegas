@@ -8,7 +8,7 @@ public class SalesReportDTO {
 
     public Double total;
     public Long salesCount;
-    public Double averageTicket;
+    public Double totalProfit;
     public Integer productsSold;
 
     public double cash;

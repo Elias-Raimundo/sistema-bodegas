@@ -13,6 +13,7 @@ public class PreparedProduct {
     private Long id;
     private String name;
     private Double price;
+    private Double costPrice = 0.0;
     
     @OneToMany(mappedBy = "preparedProduct", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PreparedProductIngredient> ingredients = new ArrayList<>();
@@ -34,6 +35,14 @@ public class PreparedProduct {
 
     public List<PreparedProductIngredient> getIngredients(){
         return ingredients;
+    }
+
+    public Double getCostPrice() {
+        return costPrice;
+    }
+
+    public void setCostPrice(Double costPrice) {
+        this.costPrice = costPrice;
     }
 
     public Company getCompany() {

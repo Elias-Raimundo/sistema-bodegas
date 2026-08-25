@@ -5,6 +5,7 @@ import java.util.List;
 public class PreparedProductDTO {
     public String name;
     public Double price;
+    public Double costPrice;
     public List<IngredientDTO> ingredients;
 
     public static class IngredientDTO{
