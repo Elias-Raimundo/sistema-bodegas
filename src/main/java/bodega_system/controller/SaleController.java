@@ -327,10 +327,19 @@ public class SaleController {
                 companyId, fromDate, toDate
             );
         
+        List<Long> customerIds = sales.stream()
+            .map(Sale::getCustomerId)
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .toList();
+
+        Map<Long, String> customerNames = customerRepository.findAllById(customerIds)
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(Customer::getId, Customer::getName));
+
         for (Sale sale : sales) {
             if (sale.getCustomerId() != null) {
-                customerRepository.findById(sale.getCustomerId())
-                    .ifPresent(c -> sale.setCustomerName(c.getName()));
+                sale.setCustomerName(customerNames.get(sale.getCustomerId()));
             }
         }
         SalesReportDTO dto = new SalesReportDTO();

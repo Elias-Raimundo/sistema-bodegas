@@ -4,7 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import jakarta.persistence.Transient;
+
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 public class Sale {
@@ -25,10 +26,12 @@ public class Sale {
         cascade = CascadeType.ALL,
         fetch = FetchType.EAGER
     )
+    @BatchSize(size = 50)
     private List<SalePayment> payments;
 
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JsonManagedReference
+    @BatchSize(size = 50)
     private List<SaleItem> items;
 
     @Transient
