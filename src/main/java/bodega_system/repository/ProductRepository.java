@@ -35,5 +35,5 @@ public interface ProductRepository extends JpaRepository<Product, Long>{
         "COALESCE(SUM(p.costPrice * FLOOR(p.stock)),0) " +
         "FROM Product p WHERE p.company.id = :companyId"
     )
-    Object[] getInventorySummary(@org.springframework.data.repository.query.Param("companyId") Long companyId);
+    List<Object[]> getInventorySummary(@org.springframework.data.repository.query.Param("companyId") Long companyId);
 }

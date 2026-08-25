@@ -164,7 +164,8 @@ public class ProductController {
     public DashboardStats getStats(HttpServletRequest request) {
         Long companyId = (Long) request.getAttribute("companyId");
 
-        Object[] row = productRepository.getInventorySummary(companyId);
+        List<Object[]> rows = productRepository.getInventorySummary(companyId);
+        Object[] row = rows.get(0);
         long lowStockCount = productRepository.countByCompanyIdAndStockLessThan(companyId, 5.0);
 
         DashboardStats stats = new DashboardStats();
