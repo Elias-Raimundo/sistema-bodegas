@@ -355,7 +355,7 @@ public class SaleController {
         dto.totalProfit = sales.stream()
             .mapToDouble(sale -> {
                 double saleCost = sale.getItems().stream()
-                    .mapToDouble(item -> item.getCostPrice() * item.getQuantity())
+                    .mapToDouble(item -> (item.getCostPrice() != null ? item.getCostPrice() : 0.0) * item.getQuantity())
                     .sum();
                 return sale.getTotal() - saleCost;
             })

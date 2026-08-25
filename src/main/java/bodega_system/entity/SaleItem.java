@@ -18,7 +18,7 @@ public class SaleItem {
     private String productName;
     private int quantity;
     private double price;
-    private double costPrice;
+    private Double costPrice;
 
     @ManyToOne
     @JoinColumn(name = "sale_id")
@@ -34,8 +34,8 @@ public class SaleItem {
     public int getQuantity() { return quantity; }
     public double getPrice() { return price; }
     public Sale getSale(){ return sale; }
-    public double getCostPrice() { return costPrice; }
-    public void setCostPrice(double costPrice) { this.costPrice = costPrice; }
+    public Double getCostPrice() { return costPrice; }
+    public void setCostPrice(Double costPrice) { this.costPrice = costPrice; }
     public void setId(Long id) { this.id = id; }
 
     public void setItemType(String itemType) { this.itemType = itemType; }
