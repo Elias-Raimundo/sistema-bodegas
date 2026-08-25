@@ -3,6 +3,7 @@ package bodega_system.controller;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -838,25 +839,38 @@ public class TableController {
     }
 
     private void refreshItemPrices(TableOrder order, Long companyId) {
-        if (order.getItems() == null) return;
+        if (order.getItems() == null || order.getItems().isEmpty()) return;
+
+        List<Long> productIds = order.getItems().stream()
+            .filter(i -> "PRODUCT".equals(i.getItemType()))
+            .map(TableOrderItem::getProductId)
+            .distinct()
+            .toList();
+
+        List<Long> preparedIds = order.getItems().stream()
+            .filter(i -> "PREPARED".equals(i.getItemType()))
+            .map(TableOrderItem::getPreparedProductId)
+            .distinct()
+            .toList();
+
+        Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
+            .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+
+        Map<Long, PreparedProduct> preparedById = preparedProductRepository.findAllById(preparedIds).stream()
+            .collect(java.util.stream.Collectors.toMap(PreparedProduct::getId, p -> p));
 
         for (TableOrderItem item : order.getItems()) {
 
-            if (item.getItemType().equals("PRODUCT")) {
-
-                Product product = productRepository.findById(item.getProductId()).orElse(null);
-
+            if ("PRODUCT".equals(item.getItemType())) {
+                Product product = productsById.get(item.getProductId());
                 if (product != null && product.getCompany().getId().equals(companyId)) {
                     if (!product.getPrice().equals(item.getPrice())) {
                         item.setPrice(product.getPrice());
                         tableOrderItemRepository.save(item);
                     }
                 }
-
-            } else if (item.getItemType().equals("PREPARED")) {
-
-                PreparedProduct prepared = preparedProductRepository.findById(item.getPreparedProductId()).orElse(null);
-
+            } else if ("PREPARED".equals(item.getItemType())) {
+                PreparedProduct prepared = preparedById.get(item.getPreparedProductId());
                 if (prepared != null && prepared.getCompany().getId().equals(companyId)) {
                     if (!prepared.getPrice().equals(item.getPrice())) {
                         item.setPrice(prepared.getPrice());
