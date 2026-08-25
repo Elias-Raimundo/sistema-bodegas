@@ -9,4 +9,6 @@ import bodega_system.entity.CustomerMovement;
 public interface CustomerMovementRepository extends JpaRepository<CustomerMovement, Long> {
 
     List<CustomerMovement> findByCustomer_IdOrderByCreatedAtDesc(Long customerId);
+
+    List<CustomerMovement> findByCustomer_IdIn(List<Long> customerIds);
 }

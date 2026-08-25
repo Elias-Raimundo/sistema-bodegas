@@ -3,13 +3,15 @@ package bodega_system.controller;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import bodega_system.entity.*;
 import bodega_system.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/customers")
@@ -36,17 +38,124 @@ public class CustomerController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     public List<Customer> getAll(HttpServletRequest request) {
         Long companyId = (Long) request.getAttribute("companyId");
 
-        List<Customer> customers =
-            customerRepository.findByCompany_IdOrderByNameAsc(companyId);
+        List<Customer> customers = customerRepository.findByCompany_IdOrderByNameAsc(companyId);
 
+        if (customers.isEmpty()) {
+            return customers;
+        }
+
+        List<Long> customerIds = customers.stream().map(Customer::getId).toList();
+
+        // 1 query: todos los movimientos de todos los clientes
+        List<CustomerMovement> allMovements = movementRepository.findByCustomer_IdIn(customerIds);
+
+        Map<Long, List<CustomerMovement>> movementsByCustomer = allMovements.stream()
+            .collect(Collectors.groupingBy(m -> m.getCustomer().getId()));
+
+        // 1 query: todas las ventas referenciadas por esos movimientos
+        List<Long> saleIds = allMovements.stream()
+            .filter(m -> "DEBT".equals(m.getType()) && m.getSaleId() != null)
+            .map(CustomerMovement::getSaleId)
+            .distinct()
+            .toList();
+
+        Map<Long, Sale> salesById = saleRepository.findAllById(saleIds).stream()
+            .collect(Collectors.toMap(Sale::getId, s -> s));
+
+        // 1-2 queries: todos los productos/preparados usados en esas ventas
+        List<Long> productIds = salesById.values().stream()
+            .flatMap(s -> s.getItems().stream())
+            .filter(i -> "PRODUCT".equals(i.getItemType()))
+            .map(SaleItem::getProductId)
+            .distinct()
+            .toList();
+
+        List<Long> preparedIds = salesById.values().stream()
+            .flatMap(s -> s.getItems().stream())
+            .filter(i -> "PREPARED".equals(i.getItemType()))
+            .map(SaleItem::getPreparedProductId)
+            .distinct()
+            .toList();
+
+        Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, p -> p));
+
+        Map<Long, PreparedProduct> preparedById = preparedProductRepository.findAllById(preparedIds).stream()
+            .collect(Collectors.toMap(PreparedProduct::getId, p -> p));
+
+        // Ahora sí: calcular el balance de cada cliente, todo en memoria, 0 queries extra
         for (Customer customer : customers) {
-            customer.setBalance(calculateIndexedBalance(customer));
+            List<CustomerMovement> movements =
+                movementsByCustomer.getOrDefault(customer.getId(), List.of());
+            customer.setBalance(
+                calculateBalanceFromData(movements, salesById, productsById, preparedById)
+            );
         }
 
         return customers;
+    }
+
+    private double calculateBalanceFromData(
+        List<CustomerMovement> movements,
+        Map<Long, Sale> salesById,
+        Map<Long, Product> productsById,
+        Map<Long, PreparedProduct> preparedById
+    ) {
+        double debt = 0;
+        double payments = 0;
+
+        for (CustomerMovement movement : movements) {
+
+            if ("PAYMENT".equals(movement.getType())) {
+                payments += movement.getAmount();
+            }
+
+            if ("DEBT".equals(movement.getType())) {
+                if (movement.getSaleId() == null) {
+                    debt += movement.getAmount();
+                } else {
+                    Sale sale = salesById.get(movement.getSaleId());
+                    if (sale != null) {
+                        debt += calculateSaleWithCurrentPricesFromMaps(sale, productsById, preparedById);
+                    }
+                }
+            }
+        }
+
+        return Math.max(debt - payments, 0);
+    }
+
+    private double calculateSaleWithCurrentPricesFromMaps(
+        Sale sale,
+        Map<Long, Product> productsById,
+        Map<Long, PreparedProduct> preparedById
+    ) {
+        double subtotal = 0;
+
+        for (SaleItem item : sale.getItems()) {
+
+            if ("PRODUCT".equals(item.getItemType())) {
+                Product product = productsById.get(item.getProductId());
+                if (product != null) {
+                    subtotal += product.getPrice() * item.getQuantity();
+                }
+            }
+
+            if ("PREPARED".equals(item.getItemType())) {
+                PreparedProduct prepared = preparedById.get(item.getPreparedProductId());
+                if (prepared != null) {
+                    subtotal += prepared.getPrice() * item.getQuantity();
+                }
+            }
+        }
+
+        double discount = sale.getDiscount() == null ? 0 : sale.getDiscount();
+
+        return Math.max(subtotal - discount, 0);
     }
 
     @PostMapping

@@ -10,6 +10,8 @@ import bodega_system.entity.SupplierInvoice;
 import bodega_system.repository.SupplierInvoiceRepository;
 import bodega_system.repository.SupplierRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/suppliers")
@@ -30,16 +32,25 @@ public class SupplierController {
     public List<Supplier> getAll(HttpServletRequest request) {
         Long companyId = (Long) request.getAttribute("companyId");
 
-        List<Supplier> suppliers = 
-            supplierRepository.findByCompany_IdOrderByNameAsc(companyId);
-        for (Supplier supplier: suppliers){
-            double pending = invoiceRepository
-                .findBySupplier_IdOrderByInvoiceDateDesc(supplier.getId())
-                .stream()
-                .mapToDouble(SupplierInvoice::getPendingAmount)
-                .sum();
-            supplier.setPendingTotal(pending);
+        List<Supplier> suppliers = supplierRepository.findByCompany_IdOrderByNameAsc(companyId);
+
+        if (suppliers.isEmpty()) {
+            return suppliers;
         }
+
+        List<SupplierInvoice> allInvoices =
+            invoiceRepository.findBySupplier_Company_IdOrderByInvoiceDateDesc(companyId);
+
+        Map<Long, Double> pendingBySupplier = allInvoices.stream()
+            .collect(Collectors.groupingBy(
+                invoice -> invoice.getSupplier().getId(),
+                Collectors.summingDouble(SupplierInvoice::getPendingAmount)
+            ));
+
+        for (Supplier supplier : suppliers) {
+            supplier.setPendingTotal(pendingBySupplier.getOrDefault(supplier.getId(), 0.0));
+        }
+
         return suppliers;
     }
 

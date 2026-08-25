@@ -160,16 +160,16 @@ public class ProductController {
 
     @GetMapping("/stats")
     public DashboardStats getStats(HttpServletRequest request) {
-
         Long companyId = (Long) request.getAttribute("companyId");
 
-        var products = productRepository.findByCompanyId(companyId);   // ⚠️ sigue trayendo TODO
+        Object[] row = productRepository.getInventorySummary(companyId);
+        long lowStockCount = productRepository.countByCompanyIdAndStockLessThan(companyId, 5.0);
 
         DashboardStats stats = new DashboardStats();
-        stats.totalProducts = products.size();
-        stats.totalStock = products.stream().mapToDouble(p -> p.getStock()).sum();
-        stats.lowStock = products.stream().filter(p -> p.getStock() < 5).count();
-        stats.inventoryValue = products.stream().mapToDouble(p -> p.getPrice() * Math.floor(p.getStock())).sum();
+        stats.totalProducts = ((Number) row[0]).longValue();
+        stats.totalStock = ((Number) row[1]).doubleValue();
+        stats.lowStock = lowStockCount;
+        stats.inventoryValue = ((Number) row[2]).doubleValue();
 
         return stats;
     }
