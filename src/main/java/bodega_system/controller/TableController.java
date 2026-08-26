@@ -13,6 +13,7 @@ import bodega_system.dto.TableItemDTO;
 import bodega_system.entity.*;
 import bodega_system.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/tables")
@@ -150,6 +151,7 @@ public class TableController {
     }
 
     @GetMapping("/{tableId}/order")
+    @Transactional
     public TableOrder getOpenOrder(
         @PathVariable Long tableId,
         HttpServletRequest request
@@ -179,6 +181,7 @@ public class TableController {
     }
 
     @DeleteMapping("/items/{itemId}")
+    @Transactional
     public ResponseEntity<Void> removeItem(
         @PathVariable Long itemId,
         HttpServletRequest request
@@ -203,13 +206,9 @@ public class TableController {
         tableOrderItemRepository.delete(item);
         tableOrderItemRepository.flush();
 
-        TableOrder updatedOrder =
-            tableOrderRepository.findById(order.getId())
-                .orElseThrow();
-
         if (
-            updatedOrder.getItems() == null ||
-            updatedOrder.getItems().isEmpty()
+            order.getItems() == null ||
+            order.getItems().isEmpty()
         ) {
             table.setOccupied(false);
         } else {
@@ -221,7 +220,9 @@ public class TableController {
         return ResponseEntity.ok().build();
     }
 
+
     @PostMapping("/{tableId}/items")
+    @Transactional
     public TableOrder addItem(
         @PathVariable Long tableId,
         @RequestBody TableItemDTO dto,
@@ -314,6 +315,7 @@ public class TableController {
                 item.setPrice(product.getPrice());
 
                 tableOrderItemRepository.save(item);
+                order.getItems().add(item);
             }
         }
 
@@ -374,19 +376,20 @@ public class TableController {
                 item.setPrice(prepared.getPrice());
 
                 tableOrderItemRepository.save(item);
+                order.getItems().add(item);
             }
         }
 
         table.setOccupied(true);
         tableBarRepository.save(table);
 
-        TableOrder finalOrder = tableOrderRepository.findById(order.getId()).orElseThrow();
-        refreshItemPrices(finalOrder, companyId);
+        refreshItemPrices(order, companyId);
 
-        return finalOrder;
+        return order;
     }
 
     @PutMapping("/items/{itemId}/quantity")
+    @Transactional
     public TableOrder updateItemQuantity(
         @PathVariable Long itemId,
         @RequestParam int quantity,
@@ -471,13 +474,9 @@ public class TableController {
             tableOrderItemRepository.save(item);
         }
 
-        TableOrder updatedOrder = tableOrderRepository
-            .findById(order.getId())
-            .orElseThrow();
-
         if (
-            updatedOrder.getItems() == null ||
-            updatedOrder.getItems().isEmpty()
+            order.getItems() == null ||
+            order.getItems().isEmpty()
         ) {
             table.setOccupied(false);
         } else {
@@ -485,12 +484,13 @@ public class TableController {
         }
 
         tableBarRepository.save(table);
-        refreshItemPrices(updatedOrder, companyId);
+        refreshItemPrices(order, companyId);
 
-        return updatedOrder;
+        return order;
     }
 
     @PostMapping("/{tableId}/partial-payment")
+    @Transactional
     public TableOrder addPartialPayment(
         @PathVariable Long tableId,
         @RequestBody PartialPaymentDTO dto,
@@ -585,6 +585,7 @@ public class TableController {
     }
 
     @PostMapping("/{tableId}/close")
+    @Transactional
     public ResponseEntity<Void> closeTable(
         @PathVariable Long tableId,
         @RequestBody CloseTableDTO dto,
