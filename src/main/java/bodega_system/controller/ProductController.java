@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import bodega_system.entity.Category;
 import bodega_system.repository.CategoryRepository;
 import bodega_system.dto.ProductDTO;
+import bodega_system.repository.PreparedProductRepository;
 
 @RestController
 @RequestMapping("/products")
@@ -23,11 +24,18 @@ public class ProductController {
     private final ProductRepository productRepository;
     private final CompanyRepository companyRepository;
     private final CategoryRepository categoryRepository;
+    private final PreparedProductRepository preparedProductRepository;
 
-    public ProductController(ProductRepository productRepository, CompanyRepository companyRepository, CategoryRepository categoryRepository) {
+    public ProductController(
+        ProductRepository productRepository,
+        CompanyRepository companyRepository,
+        CategoryRepository categoryRepository,
+        PreparedProductRepository preparedProductRepository
+    ) {
         this.productRepository = productRepository;
         this.companyRepository = companyRepository;
         this.categoryRepository = categoryRepository;
+        this.preparedProductRepository = preparedProductRepository;
     }
 
     @PostMapping
@@ -66,7 +74,7 @@ public class ProductController {
         return productRepository.save(product);
     }
 
-    @DeleteMapping("/{id}")
+        @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id, HttpServletRequest request){
         Long companyId = (Long) request.getAttribute("companyId");
 
@@ -74,6 +82,24 @@ public class ProductController {
 
         if(!product.getCompany().getId().equals(companyId)){
             throw new RuntimeException("No autorizado");
+        }
+
+        boolean usedAsIngredient = preparedProductRepository
+            .findByCompany(product.getCompany())
+            .stream()
+            .anyMatch(pp ->
+                pp.getIngredients() != null &&
+                pp.getIngredients().stream()
+                    .anyMatch(ing ->
+                        ing.getProduct() != null &&
+                        ing.getProduct().getId().equals(id)
+                    )
+            );
+
+        if (usedAsIngredient) {
+            throw new RuntimeException(
+                "No se puede eliminar: el producto se usa como ingrediente de un preparado"
+            );
         }
 
         productRepository.delete(product);
