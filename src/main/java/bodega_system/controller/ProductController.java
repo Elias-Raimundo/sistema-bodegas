@@ -156,7 +156,7 @@ public class ProductController {
 
         if (Boolean.TRUE.equals(lowStock)) {
             var pageable = org.springframework.data.domain.PageRequest.of(0, limit);
-            return productRepository.findByCompanyIdAndStockLessThanOrderByStockAsc(companyId, 5.0, pageable);
+            return productRepository.findByCompanyIdAndStockLessThanOrderByStockAsc(companyId, 2.0, pageable);
         }
 
         
@@ -192,7 +192,7 @@ public class ProductController {
 
         List<Object[]> rows = productRepository.getInventorySummary(companyId);
         Object[] row = rows.get(0);
-        long lowStockCount = productRepository.countByCompanyIdAndStockLessThan(companyId, 5.0);
+        long lowStockCount = productRepository.countByCompanyIdAndStockLessThan(companyId, 2.0);
 
         DashboardStats stats = new DashboardStats();
         stats.totalProducts = ((Number) row[0]).longValue();
