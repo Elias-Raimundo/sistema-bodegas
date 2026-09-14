@@ -21,6 +21,13 @@ public class TableOrderItem {
     private String itemType;
     private Long preparedProductId;
 
+    // NUEVO: soporte para "dividir" un ítem entre varias mesas.
+    // linkedGroupId agrupa todas las partes de un mismo reparto.
+    // stockOwner marca cuál de las partes es la que descuenta stock real
+    // al cerrar la mesa (para no descontar el mismo producto varias veces).
+    private String linkedGroupId;
+    private Boolean stockOwner;
+
     @JsonIgnore
     @ManyToOne
     private TableOrder order;
@@ -84,5 +91,22 @@ public class TableOrderItem {
     public void setPreparedProductId(Long preparedProductId){
         this.preparedProductId = preparedProductId;
     }
- 
+
+    public String getLinkedGroupId() {
+        return linkedGroupId;
+    }
+
+    public void setLinkedGroupId(String linkedGroupId) {
+        this.linkedGroupId = linkedGroupId;
+    }
+
+
+    public boolean isStockOwner() {
+        return stockOwner == null || stockOwner;
+    }
+
+    public void setStockOwner(Boolean stockOwner) {
+        this.stockOwner = stockOwner;
+    }
+
 }

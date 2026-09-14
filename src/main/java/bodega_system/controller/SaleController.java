@@ -53,7 +53,6 @@ public class SaleController {
         double subtotal = 0;
 
         sale.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
-        System.out.println("COMPANY ID: " + companyId);
         sale.setCompany(company);
 
         if (sale.getItems() == null || sale.getItems().isEmpty()){
@@ -250,7 +249,6 @@ public class SaleController {
         }
 
         List<Sale> sales = saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
-        System.out.println("Ventas: " + sales.size());
         return sales;
     }
 

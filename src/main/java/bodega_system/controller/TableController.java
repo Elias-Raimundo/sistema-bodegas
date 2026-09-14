@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import bodega_system.dto.PartialPaymentDTO;
 import bodega_system.dto.CloseTableDTO;
 import bodega_system.dto.TableItemDTO;
+import bodega_system.dto.SplitItemDTO;
 import bodega_system.entity.*;
 import bodega_system.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -203,6 +204,10 @@ public class TableController {
             i.getId().equals(itemId)
         );
 
+        // Si esta parte era la que descontaba stock (ítem dividido entre
+        // mesas), le paso la posta a otra parte del mismo grupo.
+        reassignStockOwnerIfNeeded(item);
+
         tableOrderItemRepository.delete(item);
         tableOrderItemRepository.flush();
 
@@ -294,11 +299,8 @@ public class TableController {
                     ? existing.getQuantity() + dto.quantity
                     : dto.quantity;
 
-            if (product.getStock() < finalQuantity) {
-                throw new RuntimeException(
-                    "Stock insuficiente para " + product.getName()
-                );
-            }
+            // Se permite vender aunque el stock quede en cero o negativo
+            // (el cliente no siempre carga el stock correctamente).
 
             if (existing != null) {
                 existing.setQuantity(finalQuantity);
@@ -351,14 +353,8 @@ public class TableController {
                     throw new RuntimeException("Ingrediente no autorizado");
                 }
 
-                double stockToDiscount =
-                    ingredient.getQuantity() * finalQuantity;
-
-                if (product.getStock() < stockToDiscount) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + product.getName()
-                    );
-                }
+                // Se permite preparar aunque el stock del ingrediente
+                // quede en cero o negativo.
             }
 
             if (existing != null) {
@@ -414,6 +410,8 @@ public class TableController {
                 i.getId().equals(itemId)
             );
 
+            reassignStockOwnerIfNeeded(item);
+
             tableOrderItemRepository.delete(item);
             tableOrderItemRepository.flush();
 
@@ -429,11 +427,7 @@ public class TableController {
                     throw new RuntimeException("Producto no autorizado");
                 }
 
-                if (product.getStock() < quantity) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + product.getName()
-                    );
-                }
+                // Se permite aunque el stock quede en cero o negativo.
             }
 
             if (item.getItemType().equals("PREPARED")) {
@@ -459,14 +453,8 @@ public class TableController {
                         throw new RuntimeException("Ingrediente no autorizado");
                     }
 
-                    double stockToDiscount =
-                        ingredient.getQuantity() * quantity;
-
-                    if (product.getStock() < stockToDiscount) {
-                        throw new RuntimeException(
-                            "Stock insuficiente para " + product.getName()
-                        );
-                    }
+                    // Se permite aunque el stock del ingrediente quede
+                    // en cero o negativo.
                 }
             }
 
@@ -487,6 +475,168 @@ public class TableController {
         refreshItemPrices(order, companyId);
 
         return order;
+    }
+
+    // NUEVO: dividir un ítem de una mesa entre varias mesas (reparto
+    // desigual permitido). Cada "share" indica cuánto le corresponde
+    // pagar a cada mesa por ese ítem.
+    @PostMapping("/items/{itemId}/split")
+    @Transactional
+    public List<TableOrder> splitItem(
+        @PathVariable Long itemId,
+        @RequestBody SplitItemDTO dto,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        TableOrderItem item = tableOrderItemRepository
+            .findById(itemId)
+            .orElseThrow();
+
+        TableOrder originOrder = item.getOrder();
+        TableBar originTable = originOrder.getTable();
+
+        if (!originTable.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("No autorizado");
+        }
+
+        if (dto.shares == null || dto.shares.size() < 2) {
+            throw new RuntimeException("Debe repartir el ítem entre al menos 2 mesas");
+        }
+
+        for (SplitItemDTO.SplitShareDTO share : dto.shares) {
+            if (share.tableId == null) {
+                throw new RuntimeException("Debe indicar la mesa para cada parte del reparto");
+            }
+            if (share.amount == null || share.amount <= 0) {
+                throw new RuntimeException("Cada parte del reparto debe ser mayor a cero");
+            }
+        }
+
+        long distinctTables = dto.shares.stream()
+            .map(s -> s.tableId)
+            .distinct()
+            .count();
+
+        if (distinctTables != dto.shares.size()) {
+            throw new RuntimeException("No podés repetir la misma mesa en el reparto");
+        }
+
+        double totalValue = item.getPrice() * item.getQuantity();
+
+        double sumShares = dto.shares.stream()
+            .mapToDouble(s -> s.amount)
+            .sum();
+
+        if (Math.abs(sumShares - totalValue) > 0.01) {
+            throw new RuntimeException(
+                "La suma de las partes ($" + sumShares +
+                ") no coincide con el total del ítem ($" + totalValue + ")"
+            );
+        }
+
+        // La mesa dueña del stock es la mesa original si sigue estando
+        // en el reparto; si no, la primera mesa de la lista.
+        Long ownerTableId = dto.shares.stream()
+            .map(s -> s.tableId)
+            .filter(id -> id.equals(originTable.getId()))
+            .findFirst()
+            .orElse(dto.shares.get(0).tableId);
+
+        String groupId = java.util.UUID.randomUUID().toString();
+
+        List<TableOrder> affectedOrders = new ArrayList<>();
+
+        for (SplitItemDTO.SplitShareDTO share : dto.shares) {
+
+            boolean isOriginTable = share.tableId.equals(originTable.getId());
+            boolean makeOwner = share.tableId.equals(ownerTableId);
+
+            if (isOriginTable) {
+
+                item.setQuantity(1);
+                item.setPrice(share.amount);
+                item.setLinkedGroupId(groupId);
+                item.setStockOwner(makeOwner);
+
+                tableOrderItemRepository.save(item);
+
+                if (!affectedOrders.contains(originOrder)) {
+                    affectedOrders.add(originOrder);
+                }
+
+            } else {
+
+                TableBar destTable = tableBarRepository
+                    .findById(share.tableId)
+                    .orElseThrow();
+
+                if (!destTable.getCompany().getId().equals(companyId)) {
+                    throw new RuntimeException("Mesa destino no autorizada");
+                }
+
+                TableOrder destOrder = tableOrderRepository
+                    .findByTableAndClosedFalse(destTable)
+                    .orElseGet(() -> {
+                        TableOrder newOrder = new TableOrder();
+                        newOrder.setTable(destTable);
+                        newOrder.setClosed(false);
+                        newOrder.setItems(new ArrayList<>());
+                        return tableOrderRepository.save(newOrder);
+                    });
+
+                TableOrderItem newItem = new TableOrderItem();
+                newItem.setOrder(destOrder);
+                newItem.setItemType(item.getItemType());
+                newItem.setProductId(item.getProductId());
+                newItem.setPreparedProductId(item.getPreparedProductId());
+                newItem.setProductName(item.getProductName() + " (compartido)");
+                newItem.setQuantity(1);
+                newItem.setPrice(share.amount);
+                newItem.setLinkedGroupId(groupId);
+                newItem.setStockOwner(makeOwner);
+
+                tableOrderItemRepository.save(newItem);
+
+                if (destOrder.getItems() == null) {
+                    destOrder.setItems(new ArrayList<>());
+                }
+                destOrder.getItems().add(newItem);
+
+                destTable.setOccupied(true);
+                tableBarRepository.save(destTable);
+
+                if (!affectedOrders.contains(destOrder)) {
+                    affectedOrders.add(destOrder);
+                }
+            }
+        }
+
+        for (TableOrder affected : affectedOrders) {
+            refreshItemPrices(affected, companyId);
+        }
+
+        return affectedOrders;
+    }
+
+    // Si se borra la parte que tenía marcado el descuento de stock,
+    // le pasamos la posta a otra parte del mismo reparto para que el
+    // stock se siga descontando en algún lado.
+    private void reassignStockOwnerIfNeeded(TableOrderItem deletedItem) {
+
+        if (deletedItem.getLinkedGroupId() == null) return;
+        if (!deletedItem.isStockOwner()) return;
+
+        List<TableOrderItem> siblings = tableOrderItemRepository
+            .findByLinkedGroupId(deletedItem.getLinkedGroupId());
+
+        siblings.removeIf(i -> i.getId().equals(deletedItem.getId()));
+
+        if (!siblings.isEmpty()) {
+            TableOrderItem newOwner = siblings.get(0);
+            newOwner.setStockOwner(true);
+            tableOrderItemRepository.save(newOwner);
+        }
     }
 
     @PostMapping("/{tableId}/partial-payment")
@@ -650,11 +800,8 @@ public class TableController {
                     throw new RuntimeException("Producto no autorizado");
                 }
 
-                if (product.getStock() < tableItem.getQuantity()) {
-                    throw new RuntimeException(
-                        "Stock insuficiente para " + product.getName()
-                    );
-                }
+                // Se permite cerrar la mesa aunque el stock quede en
+                // cero o negativo (no se valida stock disponible acá).
                 saleItem.setCostPrice(product.getCostPrice() != null ? product.getCostPrice() : 0.0);
 
             } else if (tableItem.getItemType().equals("PREPARED")) {
@@ -680,14 +827,8 @@ public class TableController {
                         throw new RuntimeException("Ingrediente no autorizado");
                     }
 
-                    double stockToDiscount =
-                        ingredient.getQuantity() * tableItem.getQuantity();
-
-                    if (product.getStock() < stockToDiscount) {
-                        throw new RuntimeException(
-                            "Stock insuficiente para " + product.getName()
-                        );
-                    }
+                    // Se permite cerrar la mesa aunque el stock del
+                    // ingrediente quede en cero o negativo.
                 }
                 saleItem.setCostPrice(prepared.getCostPrice() != null ? prepared.getCostPrice() : 0.0);
             }
@@ -737,6 +878,12 @@ public class TableController {
 
             if (tableItem.getItemType().equals("PRODUCT")) {
 
+                // Si este ítem es parte de un reparto entre mesas, solo
+                // descuenta stock la parte marcada como "dueña".
+                if (!tableItem.isStockOwner()) {
+                    continue;
+                }
+
                 Product product = productRepository
                     .findById(tableItem.getProductId())
                     .orElseThrow();
@@ -748,6 +895,10 @@ public class TableController {
                 productRepository.save(product);
 
             } else if (tableItem.getItemType().equals("PREPARED")) {
+
+                if (!tableItem.isStockOwner()) {
+                    continue;
+                }
 
                 PreparedProduct prepared =
                     preparedProductRepository
