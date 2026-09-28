@@ -7,6 +7,7 @@ import bodega_system.entity.TableBar;
 import bodega_system.entity.TableOrder;
 
 public interface TableOrderRepository extends JpaRepository<TableOrder, Long>{
-    Optional<TableOrder> findByTableAndClosedFalse(TableBar table);
+
+    Optional<TableOrder> findFirstByTableAndClosedFalseOrderByIdAsc(TableBar table);
     List<TableOrder> findByTable(TableBar table);
 }

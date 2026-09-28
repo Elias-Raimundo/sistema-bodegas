@@ -167,7 +167,7 @@ public class TableController {
         }
 
         TableOrder order = tableOrderRepository
-            .findByTableAndClosedFalse(table)
+            .findFirstByTableAndClosedFalseOrderByIdAsc(table)
             .orElseGet(() -> {
                 TableOrder newOrder = new TableOrder();
                 newOrder.setTable(table);
@@ -175,6 +175,14 @@ public class TableController {
                 newOrder.setItems(new ArrayList<>());
                 return tableOrderRepository.save(newOrder);
             });
+
+        // Autocorrección: si la mesa figura ocupada pero el pedido está vacío,
+        // la liberamos. Así una mesa "trabada" se arregla sola al abrirla.
+        boolean hasItems = order.getItems() != null && !order.getItems().isEmpty();
+        if (table.isOccupied() != hasItems) {
+            table.setOccupied(hasItems);
+            tableBarRepository.save(table);
+        }
 
         refreshItemPrices(order, companyId);
 
@@ -254,7 +262,7 @@ public class TableController {
         }
 
         TableOrder order = tableOrderRepository
-            .findByTableAndClosedFalse(table)
+            .findFirstByTableAndClosedFalseOrderByIdAsc(table)
             .orElseGet(() -> {
                 TableOrder newOrder = new TableOrder();
 
@@ -576,7 +584,7 @@ public class TableController {
                 }
 
                 TableOrder destOrder = tableOrderRepository
-                    .findByTableAndClosedFalse(destTable)
+                    .findFirstByTableAndClosedFalseOrderByIdAsc(destTable)
                     .orElseGet(() -> {
                         TableOrder newOrder = new TableOrder();
                         newOrder.setTable(destTable);
@@ -655,7 +663,7 @@ public class TableController {
         }
 
         TableOrder order = tableOrderRepository
-            .findByTableAndClosedFalse(table)
+            .findFirstByTableAndClosedFalseOrderByIdAsc(table)
             .orElseThrow();
 
         if (dto.amount == null || dto.amount <= 0) {
@@ -754,7 +762,7 @@ public class TableController {
         }
 
         TableOrder order = tableOrderRepository
-            .findByTableAndClosedFalse(table)
+            .findFirstByTableAndClosedFalseOrderByIdAsc(table)
             .orElseThrow();
 
         if (order.getItems() == null || order.getItems().isEmpty()) {
