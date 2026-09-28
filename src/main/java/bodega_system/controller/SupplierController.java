@@ -56,10 +56,15 @@ public class SupplierController {
 
     @PostMapping
     public Supplier createSupplier(
-        @RequestBody Supplier supplier,
+        @RequestBody Supplier input,
         HttpServletRequest request
     ) {
         Long companyId = (Long) request.getAttribute("companyId");
+
+        // Proveedor NUEVO con solo los campos permitidos (sin "id" del cliente)
+        Supplier supplier = new Supplier();
+        supplier.setName(input.getName());
+        supplier.setDescription(input.getDescription());
 
         if (supplier.getName() == null || supplier.getName().trim().isEmpty()) {
             throw new RuntimeException("El nombre del proveedor es obligatorio");
@@ -150,10 +155,18 @@ public class SupplierController {
     @PostMapping("/{supplierId}/invoices")
     public SupplierInvoice createInvoice(
         @PathVariable Long supplierId,
-        @RequestBody SupplierInvoice invoice,
+        @RequestBody SupplierInvoice input,
         HttpServletRequest request
     ) {
         Long companyId = (Long) request.getAttribute("companyId");
+
+        // Factura NUEVA con solo los campos permitidos (sin "id" del cliente)
+        SupplierInvoice invoice = new SupplierInvoice();
+        invoice.setInvoiceNumber(input.getInvoiceNumber());
+        invoice.setInvoiceDate(input.getInvoiceDate());
+        invoice.setTotalAmount(input.getTotalAmount());
+        invoice.setPaidAmount(input.getPaidAmount());
+        invoice.setDescription(input.getDescription());
 
         Supplier supplier = supplierRepository.findById(supplierId)
             .orElseThrow();

@@ -1,5 +1,7 @@
 package bodega_system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -17,6 +19,7 @@ public class TableBar{
     private boolean occupied;
 
     @ManyToOne
+    @JsonIgnore // evita mandar la empresa (con el logo) en cada respuesta
     private Company company;
 
     public Company getCompany(){

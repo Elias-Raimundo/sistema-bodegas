@@ -1,5 +1,7 @@
 package bodega_system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ public class PreparedProduct {
     private List<PreparedProductIngredient> ingredients = new ArrayList<>();
 
     @ManyToOne
+    @JsonIgnore // evita mandar la empresa (con el logo) en cada respuesta
     private Company company;
 
     public Long getId() {

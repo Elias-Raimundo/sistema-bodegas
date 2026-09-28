@@ -1,5 +1,7 @@
 package bodega_system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -15,11 +17,13 @@ public class User {
 
     private String resetCode;
     private Long resetCodeExpiry;
+    private Integer resetAttempts;
 
     private String avatar;
 
     @ManyToOne
     @JoinColumn(name = "company_id")
+    @JsonIgnore // evita mandar la empresa (con el logo) en cada respuesta
     private Company company;
 
     public Long getId(){
@@ -64,5 +68,13 @@ public class User {
 
     public void setResetCodeExpiry(Long resetCodeExpiry) {
         this.resetCodeExpiry = resetCodeExpiry;
+    }
+
+    public Integer getResetAttempts() {
+        return resetAttempts;
+    }
+
+    public void setResetAttempts(Integer resetAttempts) {
+        this.resetAttempts = resetAttempts;
     }
 }

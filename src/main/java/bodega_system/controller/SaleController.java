@@ -43,7 +43,38 @@ public class SaleController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<?> create(@RequestBody Sale sale, HttpServletRequest req) {
+    public ResponseEntity<?> create(@RequestBody Sale input, HttpServletRequest req) {
+
+        // Armamos una venta NUEVA copiando solo lo que el cliente puede elegir:
+        // qué productos, cuántos, descuento, cliente y formas de pago.
+        // Precios, costos, totales y fecha los calcula siempre el servidor.
+        Sale sale = new Sale();
+        sale.setDiscount(input.getDiscount());
+        sale.setCustomerId(input.getCustomerId());
+
+        if (input.getItems() != null) {
+            List<SaleItem> items = new java.util.ArrayList<>();
+            for (SaleItem in : input.getItems()) {
+                SaleItem item = new SaleItem();
+                item.setItemType(in.getItemType());
+                item.setProductId(in.getProductId());
+                item.setPreparedProductId(in.getPreparedProductId());
+                item.setQuantity(in.getQuantity());
+                items.add(item);
+            }
+            sale.setItems(items);
+        }
+
+        if (input.getPayments() != null) {
+            List<SalePayment> payments = new java.util.ArrayList<>();
+            for (SalePayment in : input.getPayments()) {
+                SalePayment payment = new SalePayment();
+                payment.setMethod(in.getMethod());
+                payment.setAmount(in.getAmount());
+                payments.add(payment);
+            }
+            sale.setPayments(payments);
+        }
 
         Long companyId = (Long) req.getAttribute("companyId");
 

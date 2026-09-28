@@ -1,5 +1,7 @@
 package bodega_system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,6 +20,7 @@ public class Customer {
     private Double balance = 0.0;
 
     @ManyToOne
+    @JsonIgnore // evita mandar la empresa (con el logo) en cada respuesta
     private Company company;
 
     public Long getId() {

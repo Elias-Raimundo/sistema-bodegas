@@ -37,7 +37,12 @@ public class CategoryController {
     }
 
     @PostMapping
-    public Category create(@RequestBody Category category,HttpServletRequest request){
+    public Category create(@RequestBody Category input, HttpServletRequest request){
+
+        // Categoría NUEVA con solo el nombre (sin "id" del cliente)
+        Category category = new Category();
+        category.setName(input.getName());
+
         Long companyId =
             (Long) request.getAttribute("companyId");
 

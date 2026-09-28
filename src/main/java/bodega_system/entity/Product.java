@@ -1,5 +1,7 @@
 package bodega_system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -21,6 +23,7 @@ public class Product {
 
     @ManyToOne
     @JoinColumn(name = "company_id")
+    @JsonIgnore // evita mandar la empresa (con el logo) en cada respuesta
     private Company company;
 
     public Long getId(){

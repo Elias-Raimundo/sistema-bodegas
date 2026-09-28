@@ -132,6 +132,11 @@ public class ProductController {
         product.setPrice(dto.price);
         product.setCostPrice(dto.costPrice != null ? dto.costPrice : 0.0);
         product.setStock(dto.stock);
+        // Solo se pisa si viene en el pedido: el formulario de edición no tiene
+        // ese campo, y así no se borran las descripciones cargadas por CSV.
+        if (dto.description != null) {
+            product.setDescripcion(dto.description);
+        }
 
         if (dto.categoryId != null){
             Category category = categoryRepository
@@ -204,7 +209,25 @@ public class ProductController {
         return stats;
     }
 
-   @PostMapping("/import")
+    // Convierte "1500", "1500.5", "1500,50" o "1.500,50" en número.
+    private Double parseNumber(String raw, int lineNumber, String field) {
+        String v = raw.trim().replace("\"", "").replace("$", "").replace(" ", "");
+        if (v.contains(",")) {
+            // Formato argentino: el punto es de miles y la coma es decimal
+            v = v.replace(".", "").replace(",", ".");
+        }
+        try {
+            return Double.parseDouble(v);
+        } catch (NumberFormatException e) {
+            throw new RuntimeException(
+                "Fila " + lineNumber + ": el " + field + " \"" + raw.trim() + "\" no es un número válido"
+            );
+        }
+    }
+
+    // Todo o nada: si una fila falla, no se guarda ninguna.
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/import")
     public String importProducts(
         @RequestParam("file") MultipartFile file,
         HttpServletRequest request
@@ -229,12 +252,16 @@ public class ProductController {
         ) {
 
             String line;
-            boolean firstLine = true;
+            String separator = null;
+            int lineNumber = 0;
 
             while ((line = reader.readLine()) != null) {
+                lineNumber++;
 
-                if (firstLine) {
-                    firstLine = false;
+                // La primera fila es el encabezado: la usamos para detectar
+                // si el archivo separa columnas con ";" (Excel en español) o con ","
+                if (separator == null) {
+                    separator = line.contains(";") ? ";" : ",";
                     continue;
                 }
 
@@ -242,20 +269,20 @@ public class ProductController {
                     continue;
                 }
 
-                String[] data = line.split("[,;]", -1);
+                String[] data = line.split(separator, -1);
 
                 if (data.length < 4) {
                     throw new RuntimeException(
-                        "Fila inválida: " + line
+                        "Fila " + lineNumber + " inválida: " + line
                     );
                 }
 
-                String name = data[0].trim();
-                Double price = Double.parseDouble(data[1].trim());
-                Double stockToAdd = Double.parseDouble(data[2].trim());
-                String categoryName = data[3].trim();
+                String name = data[0].trim().replace("\"", "");
+                Double price = parseNumber(data[1], lineNumber, "precio");
+                Double stockToAdd = parseNumber(data[2], lineNumber, "stock");
+                String categoryName = data[3].trim().replace("\"", "");
                 String description =
-                    data.length > 4 ? data[4].trim() : "";
+                    data.length > 4 ? data[4].trim().replace("\"", "") : "";
 
                 if (name.isEmpty()) {
                     throw new RuntimeException(

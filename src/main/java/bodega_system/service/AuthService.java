@@ -86,12 +86,10 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
             .orElse(null);
 
-        if (user == null) {
-            return Map.of("error", "Usuario no encontrado");
-        }
-
-        if (!encoder.matches(request.password, user.getPassword())) {
-            return Map.of("error", "Contraseña incorrecta");
+        // Mismo mensaje en los dos casos: así nadie puede averiguar
+        // qué emails están registrados probando en el login.
+        if (user == null || !encoder.matches(request.password, user.getPassword())) {
+            return Map.of("error", "Email o contraseña incorrectos");
         }
 
         String token = jwtUtil.generateToken(

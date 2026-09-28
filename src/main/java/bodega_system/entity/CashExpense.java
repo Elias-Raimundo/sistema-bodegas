@@ -1,5 +1,7 @@
 package bodega_system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.LocalDateTime;
 
 import jakarta.persistence.*;
@@ -19,6 +21,7 @@ public class CashExpense {
     private DailyCashRegister cashRegister;
 
     @ManyToOne
+    @JsonIgnore // evita mandar la empresa (con el logo) en cada respuesta
     private Company company;
 
     public Long getId() { return id; }

@@ -160,10 +160,16 @@ public class CustomerController {
 
     @PostMapping
     public Customer create(
-        @RequestBody Customer customer,
+        @RequestBody Customer input,
         HttpServletRequest request
     ) {
         Long companyId = (Long) request.getAttribute("companyId");
+
+        // Armamos un cliente NUEVO copiando solo los campos permitidos.
+        // Si usáramos el objeto que manda el cliente, podría incluir un "id"
+        // y sobrescribir un cliente de otra empresa.
+        Customer customer = new Customer();
+        customer.setName(input.getName());
 
         if (customer.getName() == null || customer.getName().trim().isEmpty()) {
             throw new RuntimeException("El nombre del cliente es obligatorio");

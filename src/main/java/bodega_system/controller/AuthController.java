@@ -12,6 +12,7 @@ import bodega_system.entity.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.util.Map;
 import java.util.Optional;
+import java.security.SecureRandom;
 
 
 @RestController
@@ -22,6 +23,8 @@ public class AuthController {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
     private final EmailService emailService;
     private final AuthService authService;
+    private final SecureRandom secureRandom = new SecureRandom();
+    private static final int MAX_RESET_ATTEMPTS = 5;
 
     public AuthController(UserRepository userRepository, 
                             EmailService emailService,
@@ -58,22 +61,26 @@ public class AuthController {
         email = email.trim().toLowerCase();
         Optional<User> userOpt = userRepository.findByEmail(email);
 
+        // Respondemos lo mismo exista o no el email, para no revelar
+        // qué cuentas están registradas.
         if (userOpt.isEmpty()) {
-            return Map.of("error", "Usuario no encontrado");
+            return Map.of("message", "Si el email está registrado, te enviamos un código");
         }
 
         User user = userOpt.get();
 
-        String code = String.valueOf(new java.util.Random().nextInt(900000) + 100000);
+        // SecureRandom: generador criptográficamente seguro (Random no lo es)
+        String code = String.valueOf(secureRandom.nextInt(900000) + 100000);
 
         user.setResetCode(code);
         user.setResetCodeExpiry(System.currentTimeMillis() + (5 * 60 * 1000)); // 5 min
+        user.setResetAttempts(0);
 
         userRepository.save(user);
 
         emailService.sendResetCode(user.getEmail(), code);
-        
-        return Map.of("message", "Codigo enviado al email");
+
+        return Map.of("message", "Si el email está registrado, te enviamos un código");
     }
 
     @PostMapping("/reset-password")
@@ -106,23 +113,37 @@ public class AuthController {
         Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
-            return Map.of("error", "Usuario no encontrado");
+            return Map.of("error", "Código inválido o expirado");
         }
 
         User user = userOpt.get();
 
         if (
             user.getResetCode() == null ||
-            !user.getResetCode().equals(code)
-        ) {
-            return Map.of("error", "Código inválido");
-        }
-
-        if (
             user.getResetCodeExpiry() == null ||
             System.currentTimeMillis() > user.getResetCodeExpiry()
         ) {
-            return Map.of("error", "Código expirado");
+            return Map.of("error", "Código inválido o expirado");
+        }
+
+        int attempts = user.getResetAttempts() == null ? 0 : user.getResetAttempts();
+
+        if (!user.getResetCode().equals(code)) {
+            attempts++;
+
+            // Después de 5 intentos fallidos el código se anula: así no se
+            // puede probar el millón de combinaciones por fuerza bruta.
+            if (attempts >= MAX_RESET_ATTEMPTS) {
+                user.setResetCode(null);
+                user.setResetCodeExpiry(null);
+                user.setResetAttempts(0);
+                userRepository.save(user);
+                return Map.of("error", "Demasiados intentos. Pedí un código nuevo");
+            }
+
+            user.setResetAttempts(attempts);
+            userRepository.save(user);
+            return Map.of("error", "Código inválido o expirado");
         }
 
         user.setPassword(
@@ -131,6 +152,7 @@ public class AuthController {
 
         user.setResetCode(null);
         user.setResetCodeExpiry(null);
+        user.setResetAttempts(0);
 
         userRepository.save(user);
 
