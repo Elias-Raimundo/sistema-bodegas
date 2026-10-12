@@ -276,6 +276,8 @@ public class TableController {
         TableOrderItem existing = order.getItems()
             .stream()
             .filter(i ->
+                // Las partes compartidas no se mezclan con ítems nuevos
+                i.getLinkedGroupId() == null &&
                 itemType.equals(i.getItemType()) &&
                 (
                     itemType.equals("PRODUCT")
@@ -425,6 +427,12 @@ public class TableController {
 
         } else {
 
+            if (item.getLinkedGroupId() != null) {
+                throw new RuntimeException(
+                    "No se puede cambiar la cantidad de un ítem compartido. Quitalo y volvé a dividirlo."
+                );
+            }
+
             if (item.getItemType().equals("PRODUCT")) {
 
                 Product product = productRepository
@@ -508,8 +516,23 @@ public class TableController {
             throw new RuntimeException("No autorizado");
         }
 
+        if (item.getLinkedGroupId() != null) {
+            throw new RuntimeException(
+                "Este ítem ya está dividido. Quitalo y volvé a cargarlo para repartirlo de nuevo."
+            );
+        }
+
         if (dto.shares == null || dto.shares.size() < 2) {
             throw new RuntimeException("Debe repartir el ítem entre al menos 2 mesas");
+        }
+
+        // La mesa original siempre participa; si no, el ítem original
+        // quedaba entero en esa mesa y se cobraba dos veces.
+        boolean includesOrigin = dto.shares.stream()
+            .anyMatch(s -> originTable.getId().equals(s.tableId));
+
+        if (!includesOrigin) {
+            throw new RuntimeException("La mesa original tiene que participar del reparto");
         }
 
         for (SplitItemDTO.SplitShareDTO share : dto.shares) {
@@ -552,6 +575,8 @@ public class TableController {
             .orElse(dto.shares.get(0).tableId);
 
         String groupId = java.util.UUID.randomUUID().toString();
+        int parts = dto.shares.size();
+        int originalQuantity = item.getQuantity();
 
         List<TableOrder> affectedOrders = new ArrayList<>();
 
@@ -566,6 +591,8 @@ public class TableController {
                 item.setPrice(share.amount);
                 item.setLinkedGroupId(groupId);
                 item.setStockOwner(makeOwner);
+                item.setStockQuantity(makeOwner ? originalQuantity : 0);
+                item.setSplitParts(parts);
 
                 tableOrderItemRepository.save(item);
 
@@ -598,11 +625,13 @@ public class TableController {
                 newItem.setItemType(item.getItemType());
                 newItem.setProductId(item.getProductId());
                 newItem.setPreparedProductId(item.getPreparedProductId());
-                newItem.setProductName(item.getProductName() + " (compartido)");
+                newItem.setProductName(item.getProductName());
                 newItem.setQuantity(1);
                 newItem.setPrice(share.amount);
                 newItem.setLinkedGroupId(groupId);
                 newItem.setStockOwner(makeOwner);
+                newItem.setStockQuantity(makeOwner ? originalQuantity : 0);
+                newItem.setSplitParts(parts);
 
                 tableOrderItemRepository.save(newItem);
 
@@ -643,6 +672,7 @@ public class TableController {
         if (!siblings.isEmpty()) {
             TableOrderItem newOwner = siblings.get(0);
             newOwner.setStockOwner(true);
+            newOwner.setStockQuantity(deletedItem.getUnitsForStock());
             tableOrderItemRepository.save(newOwner);
         }
     }
@@ -793,7 +823,13 @@ public class TableController {
             saleItem.setItemType(tableItem.getItemType());
             saleItem.setProductId(tableItem.getProductId());
             saleItem.setPreparedProductId(tableItem.getPreparedProductId());
-            saleItem.setProductName(tableItem.getProductName());
+            String saleItemName = tableItem.getProductName();
+            if (tableItem.getLinkedGroupId() != null && !saleItemName.contains("(compartido")) {
+                saleItemName += tableItem.getSplitParts() != null
+                    ? " (compartido entre " + tableItem.getSplitParts() + " mesas)"
+                    : " (compartido)";
+            }
+            saleItem.setProductName(saleItemName);
             saleItem.setQuantity(tableItem.getQuantity());
             saleItem.setPrice(tableItem.getPrice());
             saleItem.setSale(sale);
@@ -887,8 +923,10 @@ public class TableController {
             if (tableItem.getItemType().equals("PRODUCT")) {
 
                 // Si este ítem es parte de un reparto entre mesas, solo
-                // descuenta stock la parte marcada como "dueña".
-                if (!tableItem.isStockOwner()) {
+                // descuenta stock la parte "dueña", y descuenta las
+                // unidades reales que se dividieron.
+                int units = tableItem.getUnitsForStock();
+                if (units <= 0) {
                     continue;
                 }
 
@@ -897,14 +935,15 @@ public class TableController {
                     .orElseThrow();
 
                 product.setStock(
-                    product.getStock() - tableItem.getQuantity()
+                    product.getStock() - units
                 );
 
                 productRepository.save(product);
 
             } else if (tableItem.getItemType().equals("PREPARED")) {
 
-                if (!tableItem.isStockOwner()) {
+                int units = tableItem.getUnitsForStock();
+                if (units <= 0) {
                     continue;
                 }
 
@@ -918,7 +957,7 @@ public class TableController {
                     Product product = ingredient.getProduct();
 
                     double stockToDiscount =
-                        ingredient.getQuantity() * tableItem.getQuantity();
+                        ingredient.getQuantity() * units;
 
                     product.setStock(product.getStock() - stockToDiscount);
                     productRepository.save(product);
@@ -1022,6 +1061,13 @@ public class TableController {
             .collect(java.util.stream.Collectors.toMap(PreparedProduct::getId, p -> p));
 
         for (TableOrderItem item : order.getItems()) {
+
+            // Las partes de un ítem dividido tienen un precio propio (la
+            // porción que paga cada mesa). No se reemplaza por el precio
+            // de lista, que era lo que hacía aparecer el precio entero.
+            if (item.getLinkedGroupId() != null) {
+                continue;
+            }
 
             if ("PRODUCT".equals(item.getItemType())) {
                 Product product = productsById.get(item.getProductId());

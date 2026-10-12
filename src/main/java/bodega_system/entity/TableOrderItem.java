@@ -28,6 +28,13 @@ public class TableOrderItem {
     private String linkedGroupId;
     private Boolean stockOwner;
 
+    // Cantidad real de unidades que descuenta del stock la parte "dueña"
+    // (ej: 2 Heineken divididas entre 3 mesas -> la dueña descuenta 2).
+    private Integer stockQuantity;
+
+    // Entre cuántas mesas se dividió el ítem (para mostrarlo en pantalla).
+    private Integer splitParts;
+
     @JsonIgnore
     @ManyToOne
     private TableOrder order;
@@ -107,6 +114,33 @@ public class TableOrderItem {
 
     public void setStockOwner(Boolean stockOwner) {
         this.stockOwner = stockOwner;
+    }
+
+    public Integer getStockQuantity() {
+        return stockQuantity;
+    }
+
+    public void setStockQuantity(Integer stockQuantity) {
+        this.stockQuantity = stockQuantity;
+    }
+
+    public Integer getSplitParts() {
+        return splitParts;
+    }
+
+    public void setSplitParts(Integer splitParts) {
+        this.splitParts = splitParts;
+    }
+
+    // Unidades a descontar del stock al cerrar la mesa:
+    // - ítem normal: su cantidad
+    // - ítem compartido: solo la parte dueña descuenta, y descuenta
+    //   las unidades reales que se dividieron (no el "1" de la parte)
+    @JsonIgnore
+    public int getUnitsForStock() {
+        if (linkedGroupId == null) return quantity;
+        if (!isStockOwner()) return 0;
+        return stockQuantity != null ? stockQuantity : quantity;
     }
 
 }
