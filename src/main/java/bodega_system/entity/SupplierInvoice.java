@@ -7,6 +7,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OrderBy;
+import java.util.ArrayList;
+import java.util.List;
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 public class SupplierInvoice {
@@ -24,6 +31,12 @@ public class SupplierInvoice {
     private Double paidAmount = 0.0;
 
     private String description;
+
+    // Detalle de productos (solo en facturas cargadas como compra)
+    @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("id")
+    @BatchSize(size = 50)
+    private List<SupplierInvoiceItem> items = new ArrayList<>();
 
     @ManyToOne
     private Supplier supplier;
@@ -103,4 +116,7 @@ public class SupplierInvoice {
 
         return "PENDIENTE";
     }
+
+    public List<SupplierInvoiceItem> getItems() { return items; }
+    public void setItems(List<SupplierInvoiceItem> items) { this.items = items; }
 }

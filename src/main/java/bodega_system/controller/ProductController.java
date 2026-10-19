@@ -193,10 +193,10 @@ public class ProductController {
             .toList();
     }
 
-    // AUMENTO DE PRECIOS EN MASA
-    // Aplica un porcentaje a todos los productos (o a una categoría) o a los
-    // tragos, y redondea hacia arriba. La vista previa la arma el frontend
-    // con esta misma fórmula (calculateNewPrice).
+    // ACTUALIZACIÓN DE PRECIOS EN MASA
+    // Aplica un porcentaje o un monto fijo a los productos (o tragos)
+    // elegidos, sobre el precio de venta, el de costo o ambos.
+    // La vista previa la arma el frontend con estas mismas fórmulas.
     @PostMapping("/bulk-price")
     @org.springframework.transaction.annotation.Transactional
     public java.util.Map<String, Object> bulkPrice(
@@ -206,64 +206,86 @@ public class ProductController {
         Long companyId = (Long) request.getAttribute("companyId");
         Company company = companyRepository.findById(companyId).orElseThrow();
 
-        if (dto.percent == null || dto.percent == 0) {
-            throw new RuntimeException("Indicá un porcentaje distinto de cero");
+        if (dto.ids == null || dto.ids.isEmpty()) {
+            throw new RuntimeException("Elegí al menos un producto");
         }
-        if (dto.percent < -90 || dto.percent > 500) {
+        if (dto.value == null || dto.value == 0) {
+            throw new RuntimeException("Indicá un valor distinto de cero");
+        }
+
+        boolean byAmount = "AMOUNT".equals(dto.mode);
+        if (!byAmount && (dto.value < -90 || dto.value > 500)) {
             throw new RuntimeException("El porcentaje tiene que estar entre -90 % y 500 %");
         }
+        if (byAmount && Math.abs(dto.value) > 100_000_000) {
+            throw new RuntimeException("Monto inválido");
+        }
+
+        String applyTo = dto.applyTo == null ? "PRICE" : dto.applyTo;
+        boolean changePrice = applyTo.equals("PRICE") || applyTo.equals("BOTH");
+        boolean changeCost = applyTo.equals("COST") || applyTo.equals("BOTH");
 
         int roundTo = dto.roundTo == null ? 0 : dto.roundTo;
         if (roundTo < 0 || roundTo > 1000) {
             throw new RuntimeException("Redondeo inválido");
         }
 
+        java.util.Set<Long> ids = new java.util.HashSet<>(dto.ids);
         int updated = 0;
 
         if ("PREPARED".equals(dto.target)) {
             for (PreparedProduct prepared : preparedProductRepository.findByCompany(company)) {
-                if (prepared.getPrice() == null) continue;
-                prepared.setPrice(calculateNewPrice(prepared.getPrice(), dto.percent, roundTo));
+                if (!ids.contains(prepared.getId())) continue;
+
+                if (changePrice && prepared.getPrice() != null) {
+                    prepared.setPrice(newSalePrice(prepared.getPrice(), byAmount, dto.value, roundTo));
+                }
+                if (changeCost) {
+                    double cost = prepared.getCostPrice() == null ? 0 : prepared.getCostPrice();
+                    prepared.setCostPrice(newCostPrice(cost, byAmount, dto.value));
+                }
                 preparedProductRepository.save(prepared);
                 updated++;
             }
         } else {
-            List<Product> products;
-
-            if (dto.categoryId != null) {
-                categoryRepository.findByIdAndCompany(dto.categoryId, company)
-                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
-                products = productRepository.findByCompanyIdAndCategoryId(companyId, dto.categoryId);
-            } else {
-                products = productRepository.findByCompanyId(companyId);
-            }
+            List<Product> products = productRepository.findAllById(ids);
 
             for (Product product : products) {
-                if (product.getPrice() == null) continue;
-                product.setPrice(calculateNewPrice(product.getPrice(), dto.percent, roundTo));
+                // Solo productos de esta empresa
+                if (!product.getCompany().getId().equals(companyId)) continue;
+
+                if (changePrice && product.getPrice() != null) {
+                    product.setPrice(newSalePrice(product.getPrice(), byAmount, dto.value, roundTo));
+                }
+                if (changeCost) {
+                    double cost = product.getCostPrice() == null ? 0 : product.getCostPrice();
+                    product.setCostPrice(newCostPrice(cost, byAmount, dto.value));
+                }
+                productRepository.save(product);
                 updated++;
             }
-
-            productRepository.saveAll(products);
         }
 
         return java.util.Map.of("updated", updated);
     }
 
-    // Precio nuevo = precio * (1 + porcentaje), redondeado hacia arriba al
-    // múltiplo elegido (ej: 1234 con redondeo 50 → 1250). Nunca menor a 0.
-    private double calculateNewPrice(double price, double percent, int roundTo) {
-        double raw = price * (1 + percent / 100.0);
+    private double applyChange(double base, boolean byAmount, double value) {
+        double raw = byAmount ? base + value : base * (1 + value / 100.0);
+        // Evita errores de coma flotante (ej: 1000 * 1.1 = 1100.0000000000002)
+        return Math.round(raw * 100) / 100.0;
+    }
 
-        // Evita que errores de coma flotante suban un escalón de más
-        // (ej: 1000 * 1.1 = 1100.0000000000002)
-        raw = Math.round(raw * 100) / 100.0;
-
-        double result = roundTo > 1
-            ? Math.ceil(raw / roundTo) * roundTo
-            : Math.ceil(raw);
-
+    // Precio de venta: redondeado hacia arriba al múltiplo elegido
+    // (ej: 1234 con redondeo 50 → 1250). Nunca menor a 0.
+    private double newSalePrice(double price, boolean byAmount, double value, int roundTo) {
+        double raw = applyChange(price, byAmount, value);
+        double result = roundTo > 1 ? Math.ceil(raw / roundTo) * roundTo : Math.ceil(raw);
         return Math.max(result, 0);
+    }
+
+    // Costo: sin redondeo (es lo que cobra el proveedor), con 2 decimales
+    private double newCostPrice(double cost, boolean byAmount, double value) {
+        return Math.max(applyChange(cost, byAmount, value), 0);
     }
 
     @GetMapping("/stats")
