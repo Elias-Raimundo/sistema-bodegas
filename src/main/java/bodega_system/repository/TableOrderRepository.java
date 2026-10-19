@@ -10,4 +10,6 @@ public interface TableOrderRepository extends JpaRepository<TableOrder, Long>{
 
     Optional<TableOrder> findFirstByTableAndClosedFalseOrderByIdAsc(TableBar table);
     List<TableOrder> findByTable(TableBar table);
+
+    List<TableOrder> findByTable_Company_IdAndClosedFalseOrderByIdAsc(Long companyId);
 }

@@ -151,6 +151,18 @@ public class TableController {
         return ResponseEntity.ok().build();
     }
 
+    // Todos los pedidos abiertos de la empresa en una sola llamada.
+    // El frontend los guarda en la computadora para poder seguir
+    // trabajando con las mesas si se corta internet.
+    @GetMapping("/orders/open")
+    @Transactional(readOnly = true)
+    public List<TableOrder> getOpenOrders(HttpServletRequest request) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        return tableOrderRepository
+            .findByTable_Company_IdAndClosedFalseOrderByIdAsc(companyId);
+    }
+
     @GetMapping("/{tableId}/order")
     @Transactional
     public TableOrder getOpenOrder(
@@ -740,7 +752,7 @@ public class TableController {
             movement.setType("DEBT");
             movement.setAmount(dto.amount);
             movement.setDescription("Pago parcial - Mesa " + table.getName());
-            movement.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+            movement.setCreatedAt(bodega_system.config.OfflineTime.resolve(request));
 
             customerMovementRepository.save(movement);
 
@@ -757,7 +769,7 @@ public class TableController {
         payment.setCustomerId(
             dto.method.name().equals("CURRENT_ACCOUNT") ? dto.customerId : null
         );
-        payment.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+        payment.setCreatedAt(bodega_system.config.OfflineTime.resolve(request));
 
         tableOrderPaymentRepository.save(payment);
 
@@ -810,7 +822,7 @@ public class TableController {
         }
 
         Sale sale = new Sale();
-        sale.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+        sale.setCreatedAt(bodega_system.config.OfflineTime.resolve(request));
         sale.setCompany(company);
 
         List<SaleItem> saleItems = new ArrayList<>();
@@ -1020,7 +1032,7 @@ public class TableController {
             movement.setType("DEBT");
             movement.setAmount(currentAccountAmount);
             movement.setDescription("Venta mesa #" + table.getName() + " - Venta #" + sale.getId());
-            movement.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+            movement.setCreatedAt(bodega_system.config.OfflineTime.resolve(request));
 
             customerMovementRepository.save(movement);
             customer.setBalance(

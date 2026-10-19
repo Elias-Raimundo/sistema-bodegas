@@ -45,6 +45,10 @@ public class SaleController {
     @Transactional
     public ResponseEntity<?> create(@RequestBody Sale input, HttpServletRequest req) {
 
+        // Una venta hecha sin conexión ya se cobró: al sincronizarla no se
+        // rechaza por falta de stock (puede quedar en negativo, igual que en mesas).
+        boolean offline = bodega_system.config.OfflineTime.isOffline(req);
+
         // Armamos una venta NUEVA copiando solo lo que el cliente puede elegir:
         // qué productos, cuántos, descuento, cliente y formas de pago.
         // Precios, costos, totales y fecha los calcula siempre el servidor.
@@ -83,7 +87,7 @@ public class SaleController {
 
         double subtotal = 0;
 
-        sale.setCreatedAt(LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+        sale.setCreatedAt(bodega_system.config.OfflineTime.resolve(req));
         sale.setCompany(company);
 
         if (sale.getItems() == null || sale.getItems().isEmpty()){
@@ -105,7 +109,7 @@ public class SaleController {
                 if (!product.getCompany().getId().equals(companyId)){
                     throw new RuntimeException("Producto no autorizado");
                 }
-                if (product.getStock() < item.getQuantity()){
+                if (!offline && product.getStock() < item.getQuantity()){
                     throw new RuntimeException(
                         "Stock insuficiente para " + product.getName()
                     );
@@ -146,7 +150,7 @@ public class SaleController {
                     double stockToDiscount =
                             ingredient.getQuantity() * item.getQuantity();
 
-                    if (product.getStock() < stockToDiscount) {
+                    if (!offline && product.getStock() < stockToDiscount) {
                         throw new RuntimeException(
                             "Stock insuficiente para " + product.getName()
                         );
@@ -248,7 +252,7 @@ public class SaleController {
             movement.setType("DEBT");
             movement.setAmount(currentAccountAmount);
             movement.setDescription("Venta #" + savedSale.getId());
-            movement.setCreatedAt(LocalDateTime.now(ZoneId.of("America/Argentina/Buenos_Aires")));
+            movement.setCreatedAt(bodega_system.config.OfflineTime.resolve(req));
 
             customerMovementRepository.save(movement);
             customer.setBalance(
