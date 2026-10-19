@@ -843,6 +843,7 @@ public class TableController {
             }
             saleItem.setProductName(saleItemName);
             saleItem.setQuantity(tableItem.getQuantity());
+            saleItem.setStockUnits(tableItem.getUnitsForStock());
             saleItem.setPrice(tableItem.getPrice());
             saleItem.setSale(sale);
 

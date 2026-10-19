@@ -11,4 +11,6 @@ public interface CustomerMovementRepository extends JpaRepository<CustomerMoveme
     List<CustomerMovement> findByCustomer_IdOrderByCreatedAtDesc(Long customerId);
 
     List<CustomerMovement> findByCustomer_IdIn(List<Long> customerIds);
+
+    List<CustomerMovement> findBySaleId(Long saleId);
 }

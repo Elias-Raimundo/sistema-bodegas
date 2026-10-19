@@ -17,4 +17,7 @@ public class SalesReportDTO {
     public double credit;
 
     public List<Sale> sales;
+
+    // Ventas anuladas del período (no cuentan en ningún total)
+    public List<Sale> cancelledSales;
 }

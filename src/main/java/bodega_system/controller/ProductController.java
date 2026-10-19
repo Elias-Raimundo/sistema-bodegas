@@ -15,6 +15,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import bodega_system.entity.Category;
 import bodega_system.repository.CategoryRepository;
 import bodega_system.dto.ProductDTO;
+import bodega_system.dto.BulkPriceDTO;
+import bodega_system.entity.PreparedProduct;
 import bodega_system.repository.PreparedProductRepository;
 
 @RestController
@@ -189,6 +191,79 @@ public class ProductController {
             .stream()
             .limit(limit)
             .toList();
+    }
+
+    // AUMENTO DE PRECIOS EN MASA
+    // Aplica un porcentaje a todos los productos (o a una categoría) o a los
+    // tragos, y redondea hacia arriba. La vista previa la arma el frontend
+    // con esta misma fórmula (calculateNewPrice).
+    @PostMapping("/bulk-price")
+    @org.springframework.transaction.annotation.Transactional
+    public java.util.Map<String, Object> bulkPrice(
+        @RequestBody BulkPriceDTO dto,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+        Company company = companyRepository.findById(companyId).orElseThrow();
+
+        if (dto.percent == null || dto.percent == 0) {
+            throw new RuntimeException("Indicá un porcentaje distinto de cero");
+        }
+        if (dto.percent < -90 || dto.percent > 500) {
+            throw new RuntimeException("El porcentaje tiene que estar entre -90 % y 500 %");
+        }
+
+        int roundTo = dto.roundTo == null ? 0 : dto.roundTo;
+        if (roundTo < 0 || roundTo > 1000) {
+            throw new RuntimeException("Redondeo inválido");
+        }
+
+        int updated = 0;
+
+        if ("PREPARED".equals(dto.target)) {
+            for (PreparedProduct prepared : preparedProductRepository.findByCompany(company)) {
+                if (prepared.getPrice() == null) continue;
+                prepared.setPrice(calculateNewPrice(prepared.getPrice(), dto.percent, roundTo));
+                preparedProductRepository.save(prepared);
+                updated++;
+            }
+        } else {
+            List<Product> products;
+
+            if (dto.categoryId != null) {
+                categoryRepository.findByIdAndCompany(dto.categoryId, company)
+                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+                products = productRepository.findByCompanyIdAndCategoryId(companyId, dto.categoryId);
+            } else {
+                products = productRepository.findByCompanyId(companyId);
+            }
+
+            for (Product product : products) {
+                if (product.getPrice() == null) continue;
+                product.setPrice(calculateNewPrice(product.getPrice(), dto.percent, roundTo));
+                updated++;
+            }
+
+            productRepository.saveAll(products);
+        }
+
+        return java.util.Map.of("updated", updated);
+    }
+
+    // Precio nuevo = precio * (1 + porcentaje), redondeado hacia arriba al
+    // múltiplo elegido (ej: 1234 con redondeo 50 → 1250). Nunca menor a 0.
+    private double calculateNewPrice(double price, double percent, int roundTo) {
+        double raw = price * (1 + percent / 100.0);
+
+        // Evita que errores de coma flotante suban un escalón de más
+        // (ej: 1000 * 1.1 = 1100.0000000000002)
+        raw = Math.round(raw * 100) / 100.0;
+
+        double result = roundTo > 1
+            ? Math.ceil(raw / roundTo) * roundTo
+            : Math.ceil(raw);
+
+        return Math.max(result, 0);
     }
 
     @GetMapping("/stats")

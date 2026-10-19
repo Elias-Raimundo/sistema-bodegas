@@ -49,6 +49,7 @@ public class CashClosureController {
             .findByCompany_IdOrderByCreatedAtDesc(companyId)
             .stream()
             .filter(s ->
+                !s.isCancelled() &&
                 s.getCreatedAt() != null &&
                 !s.getCreatedAt().isBefore(fromDate) &&
                 !s.getCreatedAt().isAfter(toDate)

@@ -137,6 +137,7 @@ public class DailyCashController {
             .findByCompany_IdOrderByCreatedAtDesc(companyId)
             .stream()
             .filter(s ->
+                !s.isCancelled() &&
                 s.getCreatedAt() != null &&
                 !s.getCreatedAt().isBefore(openedAt) &&
                 !s.getCreatedAt().isAfter(closedAt)

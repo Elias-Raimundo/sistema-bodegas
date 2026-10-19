@@ -119,7 +119,7 @@ public class CustomerController {
                     debt += movement.getAmount();
                 } else {
                     Sale sale = salesById.get(movement.getSaleId());
-                    if (sale != null) {
+                    if (sale != null && !sale.isCancelled()) {
                         debt += calculateSaleWithCurrentPricesFromMaps(sale, productsById, preparedById);
                     }
                 }
@@ -309,7 +309,7 @@ public class CustomerController {
                     Sale sale = saleRepository.findById(movement.getSaleId())
                         .orElse(null);
 
-                    if (sale != null) {
+                    if (sale != null && !sale.isCancelled()) {
                         debt += calculateSaleWithCurrentPrices(sale);
                     }
                 }

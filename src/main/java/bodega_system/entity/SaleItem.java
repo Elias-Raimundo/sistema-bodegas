@@ -20,6 +20,11 @@ public class SaleItem {
     private double price;
     private Double costPrice;
 
+    // Unidades que se descontaron del stock con esta línea (para devolverlas
+    // si se anula la venta). En ítems compartidos entre mesas solo una parte
+    // descuenta stock, por eso no siempre coincide con quantity.
+    private Integer stockUnits;
+
     @ManyToOne
     @JoinColumn(name = "sale_id")
     @JsonBackReference
@@ -45,4 +50,7 @@ public class SaleItem {
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public void setPrice(double price) { this.price = price; }
     public void setSale(Sale sale) { this.sale = sale; }
+
+    public Integer getStockUnits() { return stockUnits; }
+    public void setStockUnits(Integer stockUnits) { this.stockUnits = stockUnits; }
 }

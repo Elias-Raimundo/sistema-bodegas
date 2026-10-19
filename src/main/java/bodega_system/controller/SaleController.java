@@ -122,6 +122,7 @@ public class SaleController {
                 item.setPrice(product.getPrice());
                 item.setCostPrice(product.getCostPrice() != null ? product.getCostPrice() : 0.0);
                 item.setItemType("PRODUCT");
+                item.setStockUnits(item.getQuantity());
 
                 subtotal += item.getQuantity() * product.getPrice();
             }
@@ -172,6 +173,7 @@ public class SaleController {
                 item.setPrice(prepared.getPrice());
                 item.setCostPrice(prepared.getCostPrice() != null ? prepared.getCostPrice() : 0.0);
                 item.setItemType("PREPARED");
+                item.setStockUnits(item.getQuantity());
 
                 subtotal += item.getQuantity() * prepared.getPrice();
             }
@@ -280,11 +282,122 @@ public class SaleController {
 
         if (limit != null) {
             var pageable = org.springframework.data.domain.PageRequest.of(0, limit);
-            return saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId, pageable);
+            return saleRepository.findActiveByCompany(companyId, pageable);
         }
 
-        List<Sale> sales = saleRepository.findByCompany_IdOrderByCreatedAtDesc(companyId);
+        List<Sale> sales = saleRepository.findActiveByCompany(companyId);
         return sales;
+    }
+
+    // ANULAR VENTA
+    // La venta no se borra: queda marcada como anulada (con motivo y hora),
+    // se devuelve el stock y se saca la deuda de cuenta corriente que generó.
+    // Deja de contar en totales, caja, reportes y dashboard.
+    @PostMapping("/{saleId}/cancel")
+    @Transactional
+    public Map<String, Object> cancel(
+        @PathVariable Long saleId,
+        @RequestBody(required = false) Map<String, String> body,
+        HttpServletRequest request
+    ) {
+        Long companyId = (Long) request.getAttribute("companyId");
+
+        Sale sale = saleRepository.findById(saleId)
+            .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
+
+        if (!sale.getCompany().getId().equals(companyId)) {
+            throw new RuntimeException("Venta no autorizada");
+        }
+
+        if (sale.isCancelled()) {
+            throw new RuntimeException("La venta ya está anulada");
+        }
+
+        String reason = body == null ? null : body.get("reason");
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new RuntimeException("Indicá el motivo de la anulación");
+        }
+        reason = reason.trim();
+        if (reason.length() > 255) {
+            reason = reason.substring(0, 255);
+        }
+
+        // 1) Devolver el stock
+        for (SaleItem item : sale.getItems()) {
+            int units;
+            if (item.getStockUnits() != null) {
+                units = item.getStockUnits();
+            } else {
+                // Ventas anteriores a este cambio: los ítems compartidos entre
+                // mesas no se sabe cuánto descontaron, así que no se tocan.
+                String name = item.getProductName() == null ? "" : item.getProductName();
+                units = name.contains("(compartido") ? 0 : item.getQuantity();
+            }
+
+            if (units <= 0) continue;
+
+            if ("PREPARED".equals(item.getItemType())) {
+                if (item.getPreparedProductId() == null) continue;
+                preparedProductRepository.findById(item.getPreparedProductId()).ifPresent(prepared -> {
+                    if (!prepared.getCompany().getId().equals(companyId)) return;
+                    for (PreparedProductIngredient ingredient : prepared.getIngredients()) {
+                        Product product = ingredient.getProduct();
+                        product.setStock(product.getStock() + ingredient.getQuantity() * units);
+                        productRepository.save(product);
+                    }
+                });
+            } else {
+                if (item.getProductId() == null) continue;
+                productRepository.findById(item.getProductId()).ifPresent(product -> {
+                    if (!product.getCompany().getId().equals(companyId)) return;
+                    product.setStock(product.getStock() + units);
+                    productRepository.save(product);
+                });
+            }
+        }
+
+        // 2) Sacar la deuda de cuenta corriente que generó esta venta
+        double removedDebt = 0;
+        for (CustomerMovement movement : customerMovementRepository.findBySaleId(sale.getId())) {
+            if (!"DEBT".equals(movement.getType())) continue;
+
+            Customer customer = movement.getCustomer();
+            if (customer != null && customer.getCompany().getId().equals(companyId)) {
+                double balance = customer.getBalance() == null ? 0 : customer.getBalance();
+                customer.setBalance(Math.max(balance - movement.getAmount(), 0));
+                customerRepository.save(customer);
+            }
+
+            removedDebt += movement.getAmount();
+            customerMovementRepository.delete(movement);
+        }
+
+        // 3) Marcar la venta como anulada
+        sale.setCancelled(true);
+        sale.setCancelledAt(LocalDateTime.now(ZoneId.of("America/Argentina/Buenos_Aires")));
+        sale.setCancelReason(reason);
+        saleRepository.save(sale);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", sale.getId());
+        response.put("cancelled", true);
+
+        // Pagos parciales de mesa a cuenta corriente: se cargan como deuda
+        // suelta (sin número de venta) y no se pueden revertir solos.
+        double currentAccountPaid = sale.getPayments() == null ? 0 : sale.getPayments().stream()
+            .filter(p -> p.getMethod() != null && p.getMethod().name().equals("CURRENT_ACCOUNT"))
+            .mapToDouble(SalePayment::getAmount)
+            .sum();
+
+        if (currentAccountPaid - removedDebt > 0.01) {
+            response.put("warning",
+                "Se anuló la venta, pero $" + Math.round(currentAccountPaid - removedDebt) +
+                " se habían cargado a cuenta corriente como pago parcial de mesa. " +
+                "Revisá la cuenta del cliente y ajustalo con un pago."
+            );
+        }
+
+        return response;
     }
 
     @GetMapping("/{saleId}")
@@ -357,12 +470,16 @@ public class SaleController {
         LocalDateTime toDate =
             LocalDateTime.parse(to);
 
-        List<Sale> sales =
+        List<Sale> allSales =
             saleRepository.findByCompany_IdAndCreatedAtBetweenOrderByCreatedAtDesc(
                 companyId, fromDate, toDate
             );
-        
-        List<Long> customerIds = sales.stream()
+
+        // Las anuladas van en una lista aparte y no cuentan en los totales
+        List<Sale> sales = allSales.stream().filter(s -> !s.isCancelled()).toList();
+        List<Sale> cancelledSales = allSales.stream().filter(Sale::isCancelled).toList();
+
+        List<Long> customerIds = allSales.stream()
             .map(Sale::getCustomerId)
             .filter(java.util.Objects::nonNull)
             .distinct()
@@ -372,7 +489,7 @@ public class SaleController {
             .stream()
             .collect(java.util.stream.Collectors.toMap(Customer::getId, Customer::getName));
 
-        for (Sale sale : sales) {
+        for (Sale sale : allSales) {
             if (sale.getCustomerId() != null) {
                 sale.setCustomerName(customerNames.get(sale.getCustomerId()));
             }
@@ -423,6 +540,7 @@ public class SaleController {
         }
 
         dto.sales = sales;
+        dto.cancelledSales = cancelledSales;
         return dto;
     }
 }

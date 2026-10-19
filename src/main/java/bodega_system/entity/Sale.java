@@ -23,6 +23,12 @@ public class Sale {
 
     private Long customerId;
 
+    // Anulación: la venta no se borra, queda marcada y deja de contar
+    // en totales, caja y reportes.
+    private Boolean cancelled = false;
+    private LocalDateTime cancelledAt;
+    private String cancelReason;
+
     @OneToMany(
         mappedBy = "sale",
         cascade = CascadeType.ALL,
@@ -70,4 +76,11 @@ public class Sale {
 
     public String getCustomerName() { return customerName; }
     public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public boolean isCancelled() { return Boolean.TRUE.equals(cancelled); }
+    public void setCancelled(Boolean cancelled) { this.cancelled = cancelled; }
+    public LocalDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String cancelReason) { this.cancelReason = cancelReason; }
 }
