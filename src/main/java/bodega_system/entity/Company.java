@@ -16,8 +16,9 @@ public class Company {
     private Boolean darkMode;
 
 
-    @Column(columnDefinition = "TEXT")
-    private String logo;
+    // El logo NO se mapea acá a propósito: la columna "logo" sigue en la
+    // tabla, pero se lee/escribe con CompanyRepository.findLogoById /
+    // updateLogo. Así no viaja en cada consulta que carga la empresa.
 
 
     public Long getId(){
@@ -40,13 +41,6 @@ public class Company {
         this.email = email;
     }
 
-    public String getLogo(){
-        return logo;
-    }
-
-    public void setLogo(String logo){
-        this.logo = logo;
-    }
 
     public String getPrimaryColor(){
         return primaryColor;
